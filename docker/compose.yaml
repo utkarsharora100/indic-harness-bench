@@ -1,0 +1,7 @@
+services:
+  benchmark:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    working_dir: /workspace
+    command: ["sleep", "infinity"]

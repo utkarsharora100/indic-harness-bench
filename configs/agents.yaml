@@ -1,0 +1,15 @@
+agents:
+  react:
+    type: react
+
+  nanobot:
+    type: external
+    command: nanobot
+    args: [agent]
+    message_args: [-m]
+
+  openclaw:
+    type: external
+    command: openclaw
+    args: [agent, --local, --agent, main, --json]
+    message_file_args: [--message-file]

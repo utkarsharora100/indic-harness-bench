@@ -1,0 +1,17 @@
+# Fill this file after pinning the exact Harness-Bench release used for the study.
+# Do not copy task IDs from an unpinned or changing branch.
+source:
+  repository: https://github.com/Qihoo360/harness-bench
+  revision: ""
+
+target_count: 24
+
+quotas:
+  software_engineering: 6
+  data_file_processing: 5
+  shell_tool_use: 4
+  office_business: 4
+  knowledge_retrieval: 3
+  multi_step_workflow: 2
+
+tasks: []

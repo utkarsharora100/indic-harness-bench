@@ -1,0 +1,12 @@
+models:
+  local:
+    model: qwen3:8b
+    base_url: http://localhost:11434/v1
+    api_key_env: OPENAI_API_KEY
+
+  # gemini:
+  #   provider: google_gemini
+  #   model: gemini-2.5-flash
+  #   api_key_env: GEMINI_API_KEY
+  #
+  # Gemini connection code is kept commented in agents/gemini.py for now.

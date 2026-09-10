@@ -1,0 +1,18 @@
+task_id: string
+category: string
+source_task: string | null
+instruction:
+  english: string
+  hindi: string
+  hinglish: string
+environment:
+  image: string
+  workspace: string
+  fixtures: string | null
+limits:
+  max_steps: integer
+  timeout_seconds: integer
+judge:
+  command: string
+  workdir: string
+  expected_exit_code: integer

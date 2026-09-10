@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["run_id", "step", "event_type", "timestamp", "data"],
+  "properties": {
+    "run_id": {"type": "string"},
+    "step": {"type": "integer", "minimum": 0},
+    "event_type": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "data": {"type": "object"}
+  }
+}

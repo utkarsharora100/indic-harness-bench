@@ -1,0 +1,22 @@
+task_id: demo
+category: software_engineering
+source_task: local_demo
+
+instruction:
+  english: "Update app.py so add(a, b) returns the sum of its two arguments. Run the test suite."
+  hindi: "app.py को अपडेट करें ताकि add(a, b) अपने दोनों arguments का योग लौटाए। Test suite चलाएँ।"
+  hinglish: "app.py ko update karo taaki add(a, b) apne dono arguments ka sum return kare. Test suite chalao."
+
+environment:
+  image: python:3.12-slim
+  workspace: workspace
+  fixtures: null
+
+limits:
+  max_steps: 10
+  timeout_seconds: 60
+
+judge:
+  command: python -m pytest -q grader/test_task.py
+  workdir: .
+  expected_exit_code: 0
