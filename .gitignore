@@ -9,11 +9,15 @@ dist/
 build/
 *.egg-info/
 
-data/runs.sqlite
+data/*.sqlite
 data/results/*
 data/traces/*
 !data/results/.gitkeep
 !data/traces/.gitkeep
 
+tmp/
+
 benchmark/tasks/*/workspace/*
 benchmark/tasks/*/runs/*
+!benchmark/tasks/demo/workspace/
+!benchmark/tasks/demo/workspace/app.py

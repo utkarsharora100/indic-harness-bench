@@ -5,11 +5,20 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from benchmark.upstream import copy_fixtures
+
 
 
 class WorkspaceSandbox:
-    def __init__(self, source_workspace: Path, image: str, mode: str) -> None:
-        self.source_workspace = source_workspace.resolve()
+    def __init__(
+        self,
+        source_workspace: Path | None,
+        image: str,
+        mode: str,
+        fixtures: Path | None = None,
+    ) -> None:
+        self.source_workspace = source_workspace.resolve() if source_workspace else None
+        self.fixtures = fixtures.resolve() if fixtures else None
         self.image = image
         self.mode = mode
         self.root: Path | None = None
@@ -23,11 +32,16 @@ class WorkspaceSandbox:
         return self.root / "workspace"
 
     def __enter__(self) -> "WorkspaceSandbox":
-        if not self.source_workspace.is_dir():
+        if self.source_workspace is not None and not self.source_workspace.is_dir():
             raise FileNotFoundError(f"Workspace not found: {self.source_workspace}")
 
         self.root = Path(tempfile.mkdtemp(prefix="ihb-"))
-        shutil.copytree(self.source_workspace, self.workspace)
+        if self.source_workspace is not None:
+            shutil.copytree(self.source_workspace, self.workspace)
+        else:
+            self.workspace.mkdir()
+        if self.fixtures is not None:
+            copy_fixtures(self.fixtures, self.workspace)
 
         if self.mode == "local":
             return self

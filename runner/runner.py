@@ -4,14 +4,14 @@ import json
 import random
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from time import monotonic
 
 from agents.base import AgentRequest
 from agents.factory import build_agent
 from benchmark.models import Language, TaskDefinition
+from benchmark.upstream import render_instruction
 from runner.config import ExperimentConfig
-from runner.grader import run_grader
+from runner.grader import run_grader, run_upstream_oracle
 from runner.log import RunStore
 from runner.sandbox import WorkspaceSandbox
 
@@ -82,23 +82,31 @@ class ExperimentRunner:
         )
 
         try:
-            source_workspace = (
-                self.config.root / "benchmark" / "tasks" / task.task_id / task.environment.workspace
-            )
+            task_root = self.config.root / "benchmark" / "tasks" / task.task_id
+            source_workspace = task_root / task.environment.workspace
+            fixtures = None
+            if task.upstream is not None:
+                source_workspace = None
+                fixtures = task_root / task.upstream.source_dir / task.upstream.fixtures_dir
             with WorkspaceSandbox(
                 source_workspace=source_workspace,
                 image=self.config.sandbox["image"],
                 mode=self.config.sandbox["mode"],
+                fixtures=fixtures,
             ) as sandbox:
                 agent = build_agent(
                     agent_name,
                     self.agents[agent_name],
                     model_config,
                     task.limits.timeout_seconds,
-                    command_runner=sandbox.run_command if self.config.sandbox["mode"] == "docker" else None,
+                )
+                workspace_for_prompt = (
+                    "/workspace" if self.config.sandbox["mode"] == "docker" else sandbox.workspace
                 )
                 request = AgentRequest(
-                    instruction=task.instruction_for(language),
+                    instruction=render_instruction(
+                        task.instruction_for(language), workspace_for_prompt
+                    ),
                     workspace=str(sandbox.workspace),
                     system_prompt=SYSTEM_PROMPT,
                     model=model_config["model"],
@@ -138,14 +146,23 @@ class ExperimentRunner:
                     "metadata": response.metadata,
                 }))
 
-                grade = run_grader(
-                    sandbox.workspace,
-                    task.judge.command,
-                    task.judge.workdir,
-                    task.judge.expected_exit_code,
-                    task.limits.timeout_seconds,
-                    command_runner=sandbox.run_command if self.config.sandbox["mode"] == "docker" else None,
-                )
+                if task.upstream is not None:
+                    grade = run_upstream_oracle(
+                        task_root / task.upstream.source_dir,
+                        task.upstream.oracle_module,
+                        sandbox.workspace,
+                        task.upstream.expected_outcome_score,
+                    )
+                else:
+                    assert task.judge is not None
+                    grade = run_grader(
+                        sandbox.workspace,
+                        task.judge.command,
+                        task.judge.workdir,
+                        task.judge.expected_exit_code,
+                        task.limits.timeout_seconds,
+                        command_runner=sandbox.run_command if self.config.sandbox["mode"] == "docker" else None,
+                    )
                 self.store.add_grade(
                     run_id,
                     "task_grader",

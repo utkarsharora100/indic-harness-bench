@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Language = Literal["english", "hindi", "hinglish"]
 
@@ -32,6 +32,16 @@ class Judge(BaseModel):
     expected_exit_code: int = 0
 
 
+class UpstreamTask(BaseModel):
+    """The copied task assets from the reference Harness-Bench repository."""
+
+    source_dir: str = "source"
+    prompt_file: str = "prompt.txt"
+    fixtures_dir: str = "fixtures"
+    oracle_module: str = "oracle_grade.py"
+    expected_outcome_score: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
 class TaskDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -41,7 +51,8 @@ class TaskDefinition(BaseModel):
     instruction: Instructions
     environment: Environment
     limits: Limits
-    judge: Judge
+    judge: Judge | None = None
+    upstream: UpstreamTask | None = None
 
     @field_validator("task_id")
     @classmethod
@@ -49,6 +60,12 @@ class TaskDefinition(BaseModel):
         if not value.strip():
             raise ValueError("task_id cannot be empty")
         return value
+
+    @model_validator(mode="after")
+    def requires_a_grader(self) -> TaskDefinition:
+        if self.judge is None and self.upstream is None:
+            raise ValueError("task must define either judge or upstream")
+        return self
 
     def instruction_for(self, language: Language) -> str:
         return getattr(self.instruction, language)

@@ -1,0 +1,59 @@
+task_id: 001-file
+category: upstream_file
+source_task: Qihoo360/harness-bench:001-file
+instruction:
+  english: 'The working directory is `$WORKSPACE`.
+
+
+    Read `in/input.txt`, count the number of lines in the file, and write the result
+    to `out/linecount.txt`.
+
+
+    Requirements:
+
+    - Write only a single integer (the line count).
+
+    - Do not modify `in/input.txt`.
+
+    '
+  hindi: 'कार्य निर्देशिका `$WORKSPACE` है।
+
+
+    `in/input.txt` पढ़ें, फ़ाइल में पंक्तियों की संख्या गिनें, और परिणाम `out/linecount.txt`
+    में लिखें।
+
+
+    आवश्यकताएँ:
+
+    - केवल एक पूर्णांक (पंक्तियों की संख्या) लिखें।
+
+    - `in/input.txt` को संशोधित न करें।
+
+    '
+  hinglish: 'Working directory `$WORKSPACE` hai.
+
+
+    `in/input.txt` padho, file mein lines ki sankhya count karo, aur result `out/linecount.txt`
+    mein likho.
+
+
+    Requirements:
+
+    - Sirf ek integer (line count) likho.
+
+    - `in/input.txt` ko modify mat karo.
+
+    '
+environment:
+  image: python:3.12-slim
+  workspace: source/fixtures
+  fixtures: source/fixtures
+limits:
+  max_steps: 20
+  timeout_seconds: 600
+upstream:
+  source_dir: source
+  prompt_file: prompt.txt
+  fixtures_dir: fixtures
+  oracle_module: oracle_grade.py
+  expected_outcome_score: 1.0

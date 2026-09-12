@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
+
+from benchmark.upstream import run_oracle
 
 
 @dataclass(slots=True)
@@ -48,5 +51,28 @@ def run_grader(
         returncode=process.returncode,
         stdout=process.stdout,
         stderr=process.stderr,
+        elapsed_seconds=monotonic() - started,
+    )
+
+
+def run_upstream_oracle(
+    task_dir: Path,
+    oracle_module: str,
+    workspace: Path,
+    expected_outcome_score: float,
+) -> GradeResult:
+    started = monotonic()
+    result = run_oracle(task_dir, oracle_module, workspace)
+    score = result.get("outcome_score", 0.0)
+    try:
+        success = float(score) >= expected_outcome_score
+    except (TypeError, ValueError):
+        success = False
+    payload = json.dumps(result, ensure_ascii=False)
+    return GradeResult(
+        success=success,
+        returncode=0 if success else 1,
+        stdout=payload,
+        stderr=str(result.get("error", "")),
         elapsed_seconds=monotonic() - started,
     )

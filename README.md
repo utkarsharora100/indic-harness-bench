@@ -57,29 +57,31 @@ pytest
 
 ## Smoke test
 
-The repository includes a local demo task. It validates task loading, tool safety, grading, storage, and the run path without requiring a research benchmark task.
+The repository includes a local demo task and an imported `001-file` task from the local Harness-Bench reference checkout. The demo validates the basic runner; `001-file` additionally validates copied upstream fixtures and its original Python oracle.
 
 For local runner development, change `sandbox.mode` to `local` in `configs/phase1.yaml`.
 
 ```bash
 python -m runner.cli list-tasks
 python -m runner.cli run --config configs/phase1.yaml --tasks demo
+python -m runner.cli run --config configs/pilot.yaml --tasks 001-file
 ```
 
 A real Docker run requires the configured container image to be available and the local model endpoint to be reachable.
 
 ## Harness-Bench import
 
-The current Qihoo360 Harness-Bench task layout uses task-local `task.yaml`, prompts, `fixtures/`, and `oracle_grade.py`. The importer copies a selected task from a local pinned checkout and does not rewrite upstream task files.
+The current Qihoo360 Harness-Bench task layout uses task-local `task.yaml`, prompts, `fixtures/`, and `oracle_grade.py`. The importer copies selected source assets under an Indic-owned `source/` directory, then creates an Indic-owned `task.yaml` containing the three language overlays. It never modifies the reference checkout.
 
 ```bash
 python -m scripts.import_harness_bench \\
     --source /path/to/harness-bench \\
     --task 001-file \\
-    --destination benchmark/tasks/hb_001_file
+    --destination benchmark/tasks/001-file \\
+    --translations benchmark/translations/001-file.yaml
 ```
 
-After importing, create the three language variants in the task's `task.yaml` or through the translation preparation process documented in `docs/experiment.md`.
+The translations file must provide `english`, `hindi`, and `hinglish` fields. Import rejects variants that omit protected paths, filenames, or backticked technical entities from the original prompt. Review translations before using their results as research evidence.
 
 ## Agents
 
@@ -99,13 +101,13 @@ The external adapters are intentionally disabled in the default Phase 1 configur
 
 ## Evaluation
 
-Each task provides a deterministic command, for example:
+Local tasks provide a deterministic command, for example:
 
 ```bash
 python -m pytest -q grader/test_task.py
 ```
 
-The run is successful only when the configured expected exit code is returned. The grader's stdout/stderr are stored with the run record.
+The run is successful only when the configured expected exit code is returned. Imported Harness-Bench tasks instead execute their copied `oracle_grade.py` and pass when its `outcome_score` reaches the task's configured threshold. Grader/oracle output is stored with the run record.
 
 ## Metrics
 

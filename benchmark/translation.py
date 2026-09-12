@@ -12,7 +12,9 @@ TECHNICAL_PATTERNS = (
 def protected_entities(text: str) -> set[str]:
     entities: set[str] = set()
     for pattern in TECHNICAL_PATTERNS:
-        entities.update(match.group(1) if match.lastindex else match.group(0) for match in pattern.finditer(text))
+        for match in pattern.finditer(text):
+            entity = match.group(1) if match.lastindex else match.group(0)
+            entities.add(entity.rstrip("`'\".,;:!?)]}"))
     return {entity for entity in entities if entity.strip()}
 
 

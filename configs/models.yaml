@@ -1,6 +1,6 @@
 models:
   local:
-    model: qwen3:8b
+    model: qwen3.5:4b
     base_url: http://localhost:11434/v1
     api_key_env: OPENAI_API_KEY
 
