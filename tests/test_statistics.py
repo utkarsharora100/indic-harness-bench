@@ -1,4 +1,4 @@
-from analysis.statistics import proportion_interval
+from analysis.metrics import proportion_interval
 
 
 def test_proportion_interval_contains_point_estimate():

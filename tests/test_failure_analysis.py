@@ -1,6 +1,6 @@
 import pytest
 
-from analysis.failure_analysis import paired_outcome, validate_category
+from analysis.metrics import paired_outcome, validate_category
 
 
 def test_paired_outcomes():
