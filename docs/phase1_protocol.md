@@ -100,3 +100,12 @@ Use `analysis/phase1.py` and the generated JSON report for task-balanced
 success, paired deltas, task-cluster bootstrap intervals, usage, timing, tool
 failures, and recovery. Infrastructure-error cells are excluded from model
 outcomes, and causal failure-stage claims wait for human annotation.
+
+Build the research-facing PDF from the completed local database with:
+
+```powershell
+py -3.14 scripts/build_phase1_pdf.py --output output/pdf/phase1_findings.pdf
+```
+
+The PDF is a tracked, privacy-safe summary; raw SQLite, traces, results, and
+the exact private model manifest remain ignored local artifacts.
