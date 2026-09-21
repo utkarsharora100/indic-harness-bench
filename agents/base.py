@@ -15,6 +15,7 @@ class AgentRequest:
     max_tokens: int
     max_steps: int
     command_runner: Callable[[str], dict[str, Any]] | None = None
+    command_timeout_seconds: int | None = None
 
 
 @dataclass(slots=True)

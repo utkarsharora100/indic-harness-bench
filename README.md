@@ -28,11 +28,9 @@ indic-harness-bench/
 
 - Python 3.11+
 - Docker Engine/Desktop for isolated runs
-- An OpenAI-compatible endpoint for the ReAct adapter
-- Optional: NanoBot
-- Optional: OpenClaw
-
-The default model configuration points to Ollama. Change `configs/models.yaml` before running a real model.
+- The university OpenAI-compatible endpoint configured in the ignored
+  `.env.uni-gpu.local` for Phase I
+- Docker Desktop/Linux engine for isolated runs
 
 ## Install
 
@@ -55,19 +53,23 @@ python -m pip install -e ".[dev]"
 pytest
 ```
 
-## Smoke test
+## Phase I execution
 
-The repository includes a local demo task and an imported `001-file` task from the local Harness-Bench reference checkout. The demo validates the basic runner; `001-file` additionally validates copied upstream fixtures and its original Python oracle.
+The source checkout `../harness-bench` is read-only reference input. Prepare
+the pinned 24-task cache, build the controlled image, run the pilot, then run
+the full matrix as described in [the protocol](docs/phase1_protocol.md).
 
-For local runner development, change `sandbox.mode` to `local` in `configs/phase1.yaml`.
-
-```bash
-python -m runner.cli list-tasks
-python -m runner.cli run --config configs/phase1.yaml --tasks demo
-python -m runner.cli run --config configs/pilot.yaml --tasks 001-file
+```powershell
+py -3.14 -m scripts.prepare_phase1 --source ..\harness-bench
+docker build -f docker/phase1.Dockerfile -t indic-harness-phase1:2026-09-21 .
+py -3.14 -m scripts.preflight_phase1 --config configs/phase1.pilot.yaml --source ..\harness-bench
+py -3.14 -m runner.cli run --config configs/phase1.pilot.yaml --resume
+py -3.14 -m runner.cli report --database data/phase1/pilot/runs.sqlite --output data/phase1/pilot/provisional_report.md
 ```
 
-A real Docker run requires the configured container image to be available and the local model endpoint to be reachable.
+Raw databases, traces, model manifests, and provisional reports live under
+ignored `data/phase1/` storage. They are never mixed with the old prototype
+pilot database.
 
 ## Harness-Bench import
 

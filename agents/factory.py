@@ -18,7 +18,7 @@ def build_agent(
 
     if kind == "react":
         api_key_name = model_config.get("api_key_env", "OPENAI_API_KEY")
-        api_key = os.environ.get(api_key_name, "ollama")
+        api_key = model_config.get("api_key") or os.environ.get(api_key_name, "ollama")
         return build_react_agent(
             model_config["base_url"],
             api_key,

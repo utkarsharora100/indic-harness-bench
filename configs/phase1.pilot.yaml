@@ -1,0 +1,41 @@
+# Five-task infrastructure pilot: one run per language.
+experiment:
+  name: phase1_pilot
+  dataset_manifest: benchmark/task_selection.yaml
+  prepared_tasks_root: data/phase1/tasks
+  seed: 17
+  repetitions: 1
+  languages: [english, hindi, hinglish]
+  tasks:
+    - 001-file
+    - 016-code-repair-pytest
+    - 050-multitable-join-analysis
+    - 025-meeting-action-tracker
+    - 019-incident-runbook-synthesis
+  agents: [react]
+  models: [university_gpu]
+
+generation:
+  temperature: 0.0
+  top_p: 1.0
+  max_tokens: 2048
+  max_steps: 40
+
+sandbox:
+  mode: docker
+  image: indic-harness-phase1:2026-09-21
+  network: none
+
+inference:
+  provider: university_gpu
+  env_file: .env.uni-gpu.local
+  requested_model_env: INDIC_UNI_GPU_MODEL
+  manifest: data/phase1/pilot-model-manifest.json
+  timeout_seconds: 90
+  max_retries: 2
+
+storage:
+  experiment_dir: data/phase1/pilot
+  database: data/phase1/pilot/runs.sqlite
+  traces_dir: data/phase1/pilot/traces
+  results_dir: data/phase1/pilot/results

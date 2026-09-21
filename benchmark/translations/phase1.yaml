@@ -1,0 +1,3138 @@
+schema_version: 1
+dataset_revision: 1025086a446653702b80cfb48babbeec35db6b2c
+generator:
+  name: codex_manual_translation
+  generated_at: '2026-09-21T13:42:10.759190+00:00'
+  review_policy: generated_unreviewed
+tasks:
+  016-code-repair-pytest:
+    source_sha256: 73f0ae3936e8d5f07b60bc81c8d7ab966ce3d71643be21f3247a62a71ab5248a
+    instructions:
+      english: '# Core Component Bug Fix Task
+
+
+        ## 1. Task Background
+
+        Guang Xiang recently submitted a Python utility script for merging environment configuration files (located at `$WORKSPACE/in/app/config_manager.py`).
+        However, the CI pipeline failed, indicating that the associated unit tests did not fully pass.
+
+        You need to act as a development agent: run the test cases to locate the bug and fix the source code.
+
+
+        ## 2. Core Subtasks
+
+        - **Run tests**: Execute `pytest $WORKSPACE/in/app/test_config.py` using the system terminal, read and understand
+        the error stack trace output.
+
+        - **Locate and fix the bug**: Analyze the logic flaw in `config_manager.py`, modify the file to correctly handle **deep
+        update** of nested dictionaries.
+
+        - **Verify the fix**: Run `pytest` again to ensure all test cases pass 100%.
+
+
+        ## 3. Required Artifacts
+
+        After completing the task, you must produce:
+
+        - The successfully fixed `$WORKSPACE/in/app/config_manager.py` file (modify and save the original file directly).
+
+        - Generate `$WORKSPACE/out/progress.md`: a brief record of your troubleshooting, root cause analysis, and the final
+        fix logic.
+
+
+        ## 4. Constraints
+
+        - **No cheating**: Absolutely do not modify any code or assertions in the test file `test_config.py`.
+
+        - **Minimal changes**: Fix only the bug‑causing logic; do not rewrite the entire file or introduce third‑party libraries
+        (e.g., `copy.deepcopy` is prohibited; implement manually).
+
+        - **Additional constraint**: In your fix, when checking whether a value is a dictionary, you must NOT use `isinstance(value,
+        dict)`. You may use alternatives such as `type(value) is dict` or `hasattr(value, ''items'')`.'
+      hindi: '# Core Component Bug Fix Task
+
+
+        ## 1. कार्य की पृष्ठभूमि
+
+        Guang Xiang ने environment configuration files को merge करने वाली Python utility script जमा की है (यह `$WORKSPACE/in/app/config_manager.py`
+        में है)। लेकिन CI pipeline विफल हुई, जिससे पता चला कि संबंधित unit tests पूरी तरह पास नहीं हुए।
+
+        आपको development agent की तरह काम करना है: bug खोजने और source code ठीक करने के लिए test cases चलाएँ।
+
+
+        ## 2. मुख्य उपकार्य
+
+        - **Tests चलाएँ**: system terminal से `pytest $WORKSPACE/in/app/test_config.py` चलाएँ और error stack trace का output
+        पढ़कर समझें।
+
+        - **Bug खोजकर ठीक करें**: `config_manager.py` की logic की समस्या का विश्लेषण करें और nested dictionaries के **deep
+        update** को सही ढंग से संभालने के लिए file बदलें।
+
+        - **Fix सत्यापित करें**: फिर से `pytest` चलाएँ और सुनिश्चित करें कि सभी test cases 100% पास हैं।
+
+
+        ## 3. आवश्यक artifacts
+
+        काम पूरा होने पर:
+
+        - ठीक की गई `$WORKSPACE/in/app/config_manager.py` file दें (मूल file को सीधे modify और save करें)।
+
+        - `$WORKSPACE/out/progress.md` बनाएँ: troubleshooting, root-cause analysis और final fix logic का संक्षिप्त record।
+
+
+        ## 4. सीमाएँ
+
+        - **Cheating नहीं**: test file `test_config.py` के किसी code या assertion को बिल्कुल modify न करें।
+
+        - **Minimal changes**: केवल bug-causing logic ठीक करें; पूरी file rewrite न करें और third-party libraries न जोड़ें
+        (जैसे `copy.deepcopy` निषिद्ध है; manual implementation करें)।
+
+        - **अतिरिक्त constraint**: value dictionary है या नहीं जाँचते समय `isinstance(value, dict)` का उपयोग नहीं करना है।
+        `type(value) is dict` या `hasattr(value, ''items'')` जैसे विकल्प उपयोग कर सकते हैं।'
+      hinglish: '# Core Component Bug Fix Task
+
+
+        ## 1. Task background
+
+        Guang Xiang ne environment configuration files merge karne wali Python utility script submit ki hai (yeh `$WORKSPACE/in/app/config_manager.py`
+        mein hai). CI pipeline fail hui, isliye associated unit tests poore pass nahi hue.
+
+        Development agent ki tarah kaam karo: bug locate karne aur source code fix karne ke liye test cases chalao.
+
+
+        ## 2. Core subtasks
+
+        - **Tests run karo**: system terminal mein `pytest $WORKSPACE/in/app/test_config.py` execute karo, phir error stack
+        trace output ko samjho.
+
+        - **Bug locate aur fix karo**: `config_manager.py` ki logic analyze karke nested dictionaries ka **deep update** sahi
+        tarah handle karo.
+
+        - **Fix verify karo**: dobara `pytest` chalao aur ensure karo ki saare test cases 100% pass hon.
+
+
+        ## 3. Required artifacts
+
+        Task ke baad:
+
+        - Successfully fixed `$WORKSPACE/in/app/config_manager.py` file do; original file ko directly modify aur save karo.
+
+        - `$WORKSPACE/out/progress.md` generate karo, jisme troubleshooting, root cause analysis aur final fix logic ka short
+        record ho.
+
+
+        ## 4. Constraints
+
+        - **No cheating**: test file `test_config.py` ka koi code ya assertion modify mat karo.
+
+        - **Minimal changes**: sirf bug-causing logic fix karo; poori file rewrite mat karo aur third-party libraries add
+        mat karo (`copy.deepcopy` prohibited hai; manually implement karo).
+
+        - **Additional constraint**: dictionary check karte waqt `isinstance(value, dict)` use nahi karna. `type(value) is
+        dict` ya `hasattr(value, ''items'')` jaise alternatives allowed hain.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  039-repo-architecture-map:
+    source_sha256: b03e9b2d88ad1baf2afb212a2ced2f886603245648916589a37d44aca6ec8124
+    instructions:
+      english: "You are given a small Python service repository at `$WORKSPACE/in/repo`.\n\nCreate exactly these deliverables:\n\
+        \n1. `$WORKSPACE/out/module_map.json`\n   - JSON object with keys: `modules`, `entry_points`, `dependency_edges`,\
+        \ `key_functions`.\n   - `modules` must be an array of module objects with at least `name`, `path`, and `purpose`.\n\
+        \   - `entry_points` must list executable/API entry points using canonical `module:function` identifiers where applicable,\
+        \ including `minisvc.cli:main` and `minisvc.api.routes:register_routes`.\n   - `dependency_edges` must contain directed\
+        \ edges as objects with `from`, `to`, and `type`; `type` should be one of `imports`, `calls`, `instantiates`, `reads_config`,\
+        \ or `persists_to`.\n   - `key_functions` must describe important functions and methods.\n   - Include a `runtime_flows`\
+        \ array describing at least the CLI startup flow and the HTTP create-order flow as ordered steps.\n2. `$WORKSPACE/out/architecture.md`\n\
+        \   - Markdown architecture summary for a new engineer.\n   - Include modules, entry points, data flow, storage, and\
+        \ risks/extension points.\n   - Call out any important runtime flow and avoid treating package marker files as business\
+        \ logic modules.\n3. `$WORKSPACE/out/doc_code_discrepancies.csv`\n   - CSV with header `claim,doc_source,code_evidence,assessment,risk`.\n\
+        \   - Compare README/design notes against the actual implementation.\n   - At minimum, cover readonly enforcement,\
+        \ retry behavior, and audit persistence if they differ from code.\n   - `assessment` should be one of `confirmed`,\
+        \ `contradicted`, or `unsupported`.\n4. `$WORKSPACE/out/risk_register.csv`\n   - CSV with header `risk_id,area,evidence,impact,mitigation,owner_hint`.\n\
+        \   - Cover at least storage/data durability, audit behavior, configuration/runtime environment, and API input validation.\n\
+        \   - Each row must cite concrete code evidence such as a module, function, or filename.\n5. `$WORKSPACE/out/onboarding_plan.md`\n\
+        \   - A concise onboarding plan for a new engineer.\n   - Include a recommended read order, local run/test commands,\
+        \ first debugging breakpoint or trace point, and two safe first changes.\n   - The plan must distinguish active runtime\
+        \ code from package marker/dead-simple files.\n\nDo not modify anything under `$WORKSPACE/in/repo`. Do not use internet\
+        \ access. Use only the files in the fixture repository.\n"
+      hindi: "आपको `$WORKSPACE/in/repo` में एक छोटा Python service repository दिया गया है।\n\nठीक ये deliverables बनाएँ:\n\
+        \n1. `$WORKSPACE/out/module_map.json`\n   - `modules`, `entry_points`, `dependency_edges`, `key_functions` keys वाला\
+        \ JSON object बनाएँ।\n   - `modules` में कम-से-कम `name`, `path`, `purpose` वाले module objects की array हो।\n   -\
+        \ `entry_points` में executable/API entry points को जहाँ लागू हो canonical `module:function` identifiers के रूप में\
+        \ रखें; इसमें `minisvc.cli:main` और `minisvc.api.routes:register_routes` अवश्य हों।\n   - `dependency_edges` में `from`,\
+        \ `to`, `type` वाले directed edge objects हों; `type` केवल `imports`, `calls`, `instantiates`, `reads_config`, या\
+        \ `persists_to` में से हो।\n   - `key_functions` महत्वपूर्ण functions और methods का वर्णन करे।\n   - कम-से-कम CLI\
+        \ startup flow और HTTP create-order flow को ordered steps के रूप में बताने वाली `runtime_flows` array शामिल करें।\n\
+        2. `$WORKSPACE/out/architecture.md`\n   - नए engineer के लिए Markdown architecture summary लिखें।\n   - modules, entry\
+        \ points, data flow, storage और risks/extension points शामिल करें।\n   - महत्वपूर्ण runtime flow को स्पष्ट करें और\
+        \ package marker files को business-logic modules न मानें।\n3. `$WORKSPACE/out/doc_code_discrepancies.csv`\n   - header\
+        \ `claim,doc_source,code_evidence,assessment,risk` रखें।\n   - README/design notes की actual implementation से तुलना\
+        \ करें।\n   - कम-से-कम readonly enforcement, retry behavior और audit persistence को cover करें यदि वे code से अलग\
+        \ हैं।\n   - `assessment` केवल `confirmed`, `contradicted`, या `unsupported` हो।\n4. `$WORKSPACE/out/risk_register.csv`\n\
+        \   - header `risk_id,area,evidence,impact,mitigation,owner_hint` रखें।\n   - storage/data durability, audit behavior,\
+        \ configuration/runtime environment और API input validation को cover करें।\n   - हर row में module, function या filename\
+        \ जैसे concrete code evidence दें।\n5. `$WORKSPACE/out/onboarding_plan.md`\n   - नए engineer के लिए संक्षिप्त onboarding\
+        \ plan लिखें।\n   - recommended read order, local run/test commands, पहला debugging breakpoint/trace point और दो safe\
+        \ first changes शामिल करें।\n   - active runtime code को package marker/dead-simple files से अलग दिखाएँ।\n\n`$WORKSPACE/in/repo`\
+        \ के अंदर कुछ भी modify न करें। Internet access न लें। केवल fixture repository की files उपयोग करें।"
+      hinglish: "Aapko `$WORKSPACE/in/repo` mein ek chhota Python service repository diya gaya hai.\n\nExactly ye deliverables\
+        \ banao:\n\n1. `$WORKSPACE/out/module_map.json`\n   - `modules`, `entry_points`, `dependency_edges`, `key_functions`\
+        \ keys wala JSON object.\n   - `modules` mein kam-se-kam `name`, `path`, `purpose` wale module objects ki array ho.\n\
+        \   - `entry_points` mein executable/API entry points ko applicable jagah canonical `module:function` identifiers\
+        \ ke roop mein rakho; `minisvc.cli:main` aur `minisvc.api.routes:register_routes` zaroor include karo.\n   - `dependency_edges`\
+        \ directed objects hon jinke fields `from`, `to`, `type` hain; `type` sirf `imports`, `calls`, `instantiates`, `reads_config`,\
+        \ ya `persists_to` ho.\n   - `key_functions` important functions aur methods describe kare.\n   - `runtime_flows`\
+        \ array mein kam-se-kam CLI startup flow aur HTTP create-order flow ko ordered steps mein describe karo.\n2. `$WORKSPACE/out/architecture.md`\n\
+        \   - New engineer ke liye Markdown architecture summary likho.\n   - modules, entry points, data flow, storage aur\
+        \ risks/extension points cover karo.\n   - important runtime flow call out karo aur package marker files ko business-logic\
+        \ modules mat samjho.\n3. `$WORKSPACE/out/doc_code_discrepancies.csv`\n   - header `claim,doc_source,code_evidence,assessment,risk`\
+        \ rakho.\n   - README/design notes ko actual implementation se compare karo.\n   - readonly enforcement, retry behavior\
+        \ aur audit persistence ko kam-se-kam cover karo jab code se difference ho.\n   - `assessment` sirf `confirmed`, `contradicted`,\
+        \ ya `unsupported` ho.\n4. `$WORKSPACE/out/risk_register.csv`\n   - header `risk_id,area,evidence,impact,mitigation,owner_hint`\
+        \ rakho.\n   - storage/data durability, audit behavior, configuration/runtime environment aur API input validation\
+        \ cover karo.\n   - har row mein module, function ya filename jaisa concrete code evidence do.\n5. `$WORKSPACE/out/onboarding_plan.md`\n\
+        \   - New engineer ke liye concise onboarding plan likho.\n   - recommended read order, local run/test commands, first\
+        \ debugging breakpoint/trace point aur do safe first changes include karo.\n   - active runtime code ko package marker/dead-simple\
+        \ files se clearly alag karo.\n\n`$WORKSPACE/in/repo` ke andar kuch modify mat karo. Internet use mat karo; sirf fixture\
+        \ repository ki files use karo."
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  040-test-coverage-fill:
+    source_sha256: d4695bcd6cb6b1b0e69e63e2f5a7437b8812e6b9fae604e47c282b804ca093c1
+    instructions:
+      english: 'The Python package in `$WORKSPACE/in/ordercalc` has incomplete tests.
+
+
+        Your job:
+
+        - Add or edit tests under `$WORKSPACE/in/ordercalc/tests/`.
+
+        - Do not edit files under `$WORKSPACE/in/ordercalc/ordercalc/`.
+
+        - Read `$WORKSPACE/in/ordercalc/pricing_rules.md` and turn the behavioral contract into tests.
+
+        - Include boundary cases that would fail if discount order, free-shipping threshold, bulk aggregation, or rounding
+        behavior were implemented incorrectly.
+
+        - The evaluator will run mutation checks against intentionally broken pricing implementations; good tests should fail
+        those mutants.
+
+        - The final command `python -m pytest $WORKSPACE/in/ordercalc/tests` must pass.
+
+        - Add `$WORKSPACE/in/ordercalc/tests/TEST_INTENT.md` explaining which pricing-rule risks your tests cover. It must
+        mention discount order, free-shipping threshold, bulk aggregation, rounding, coupons, expedited shipping, and validation
+        errors.
+
+
+        Forbidden:
+
+        - Do not hard-code private implementation text such as exact source line snippets.
+
+        - Do not monkeypatch the functions under test to force success.
+
+        - Do not skip or xfail the required behavior tests.
+
+        '
+      hindi: '`$WORKSPACE/in/ordercalc` Python package में incomplete tests हैं।
+
+
+        आपका काम:
+
+        - `$WORKSPACE/in/ordercalc/tests/` के अंदर tests जोड़ें या edit करें।
+
+        - `$WORKSPACE/in/ordercalc/ordercalc/` के अंदर files edit न करें।
+
+        - `$WORKSPACE/in/ordercalc/pricing_rules.md` पढ़कर behavioral contract को tests में बदलें।
+
+        - ऐसे boundary cases शामिल करें जो discount order, free-shipping threshold, bulk aggregation या rounding गलत होने
+        पर fail हों।
+
+        - Evaluator जानबूझकर broken pricing implementations पर mutation checks चलाएगा; अच्छे tests उन mutants को fail करें।
+
+        - अंतिम command `python -m pytest $WORKSPACE/in/ordercalc/tests` पास होना चाहिए।
+
+        - `$WORKSPACE/in/ordercalc/tests/TEST_INTENT.md` लिखें और बताएं कि tests किन pricing-rule risks को cover करते हैं।
+        इसमें discount order, free-shipping threshold, bulk aggregation, rounding, coupons, expedited shipping और validation
+        errors का उल्लेख होना चाहिए।
+
+
+        निषिद्ध:
+
+        - private implementation text जैसे exact source line snippets hard-code न करें।
+
+        - success force करने के लिए functions under test को monkeypatch न करें।
+
+        - आवश्यक behavior tests को skip या xfail न करें।'
+      hinglish: '`$WORKSPACE/in/ordercalc` Python package mein incomplete tests hain.
+
+
+        Aapka kaam:
+
+        - `$WORKSPACE/in/ordercalc/tests/` ke andar tests add ya edit karo.
+
+        - `$WORKSPACE/in/ordercalc/ordercalc/` ke andar files edit mat karo.
+
+        - `$WORKSPACE/in/ordercalc/pricing_rules.md` padho aur behavioral contract ko tests mein badlo.
+
+        - Aise boundary cases zaroor do jo discount order, free-shipping threshold, bulk aggregation ya rounding galat hone
+        par fail ho jayen.
+
+        - Evaluator intentionally broken pricing implementations par mutation checks chalayega; strong tests un mutants ko
+        fail karein.
+
+        - Final command `python -m pytest $WORKSPACE/in/ordercalc/tests` pass hona chahiye.
+
+        - `$WORKSPACE/in/ordercalc/tests/TEST_INTENT.md` likho aur batao tests kaunse pricing-rule risks cover karte hain.
+        Ismein discount order, free-shipping threshold, bulk aggregation, rounding, coupons, expedited shipping aur validation
+        errors mention hone chahiye.
+
+
+        Forbidden:
+
+        - private implementation text, jaise exact source line snippets, hard-code mat karo.
+
+        - functions under test ko monkeypatch karke success force mat karo.
+
+        - required behavior tests ko skip ya xfail mat karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  042-api-schema-migration:
+    source_sha256: b4cc335e2003c71f28075a496014ad16bcc54092a203063e80ef8505d65400b1
+    instructions:
+      english: 'The project in `$WORKSPACE/in/schema_migration` converts legacy order payloads to a new API shape. The schemas
+        have changed and `client.py` is incomplete.
+
+
+        Before editing, read `migration_notes.md`, `pii_policy.md`, and `sample_payloads.jsonl`; they define version-specific
+        field mappings, PII exclusions, and dirty sample records.
+
+
+        Your job:
+
+        - Update `$WORKSPACE/in/schema_migration/client.py`.
+
+        - Do not edit `old_schema.json`, `new_schema.json`, `migration_notes.md`, `pii_policy.md`, `sample_payloads.jsonl`,
+        or files under `tests/`.
+
+        - Make `python -m pytest $WORKSPACE/in/schema_migration/tests` pass.
+
+        - Preserve backward compatibility with legacy payloads and produce the new schema fields exactly.
+
+        - Support both legacy v1 payloads and already-v2 payloads.
+
+        - Support legacy v1.1 and v1.2 payloads described in `migration_notes.md`, including nested `customer`, `lines`, `shipTo`,
+        `order_ref`, and `unit_price_cents`.
+
+        - Preserve unknown v2 metadata fields under metadata.unknownFields.
+
+        - For legacy payloads, preserve unmapped extra fields under metadata.unknownFields, except obvious PII-like keys such
+        as `ssn` or `credit_card`.
+
+        - Default blank or null shipping methods to "standard".
+
+        - Add error aggregation via convert_many(payloads), returning at least `(converted, errors)` without stopping on the
+        first bad payload. Each error must include `index`, `path`, and `error`.
+
+        - If warnings are generated, return them as a third item or include them in a compatible result object. Each warning
+        must include `index`, `path`, and `warning`.
+
+        - Write `$WORKSPACE/in/schema_migration/conversion_audit.json` when convert_many is called, summarizing converted_count,
+        error_count, warning_count, pii_dropped_count, and unknown_fields_count.
+
+        - Already-v2 payloads must be idempotent: do not drop metadata.unknownFields or rewrite valid line items.
+
+        - Add CLI support so `python -m client input.jsonl output.json` reads JSONL payloads, writes the converted records
+        as JSON, and writes the audit file next to `client.py`.
+
+        - Hidden checks include multiple line items, alternate legacy shipping postal fields, and error records with useful
+        paths such as `customer_id` or `items[0].qty`.
+
+
+        Do not call external APIs. Do not replace the converter with hard-coded fixture-only output.
+
+        '
+      hindi: '`$WORKSPACE/in/schema_migration` project legacy order payloads को नए API shape में बदलता है और `client.py` अधूरी
+        है।
+
+
+        Edit से पहले `migration_notes.md`, `pii_policy.md`, और `sample_payloads.jsonl` पढ़ें; इनमें version-specific field
+        mappings, PII exclusions और dirty sample records परिभाषित हैं।
+
+
+        आपका काम:
+
+        - `$WORKSPACE/in/schema_migration/client.py` update करें।
+
+        - `old_schema.json`, `new_schema.json`, `migration_notes.md`, `pii_policy.md`, `sample_payloads.jsonl` या `tests/`
+        के अंदर files edit न करें।
+
+        - `python -m pytest $WORKSPACE/in/schema_migration/tests` पास कराएँ।
+
+        - Legacy payloads के साथ backward compatibility रखें और नए schema fields बिल्कुल सही बनाएं।
+
+        - Legacy v1 और पहले से v2 payloads दोनों support करें।
+
+        - `migration_notes.md` में बताए legacy v1.1 और v1.2 support करें, जिनमें nested `customer`, `lines`, `shipTo`, `order_ref`,
+        और `unit_price_cents` हैं।
+
+        - Unknown v2 metadata fields को `metadata.unknownFields` के अंदर रखें।
+
+        - Legacy payloads में unmapped extra fields `metadata.unknownFields` में रखें, लेकिन `ssn` या `credit_card` जैसे स्पष्ट
+        PII keys छोड़ दें।
+
+        - Blank या null shipping methods को `standard` default दें।
+
+        - `convert_many(payloads)` के जरिए error aggregation जोड़ें: कम-से-कम `(converted, errors)` लौटाएँ और पहले bad payload
+        पर रुकें नहीं। हर error में `index`, `path`, और `error` हों।
+
+        - Warnings हों तो तीसरा item लौटाएँ या compatible result object में रखें; हर warning में `index`, `path`, और `warning`
+        हों।
+
+        - `convert_many` बुलाए जाने पर `$WORKSPACE/in/schema_migration/conversion_audit.json` लिखें, जिसमें converted_count,
+        error_count, warning_count, pii_dropped_count और unknown_fields_count हों।
+
+        - पहले से v2 payloads idempotent हों: `metadata.unknownFields` न हटाएँ और valid line items rewrite न करें।
+
+        - CLI support जोड़ें ताकि `python -m client input.jsonl output.json` JSONL payloads पढ़े, converted records JSON में
+        लिखे और audit file `client.py` के पास लिखे।
+
+        - Hidden checks में multiple line items, alternate legacy shipping postal fields और useful paths जैसे `customer_id`
+        या `items[0].qty` वाले errors होंगे।
+
+
+        External APIs न बुलाएँ और converter को fixture-only hard-coded output से replace न करें।'
+      hinglish: '`$WORKSPACE/in/schema_migration` project legacy order payloads ko naye API shape mein convert karta hai aur
+        `client.py` incomplete hai.
+
+
+        Edit se pehle `migration_notes.md`, `pii_policy.md`, aur `sample_payloads.jsonl` padho; ye version-specific mappings,
+        PII exclusions aur dirty sample records define karte hain.
+
+
+        Aapka kaam:
+
+        - `$WORKSPACE/in/schema_migration/client.py` update karo.
+
+        - `old_schema.json`, `new_schema.json`, `migration_notes.md`, `pii_policy.md`, `sample_payloads.jsonl`, ya `tests/`
+        ke andar files edit mat karo.
+
+        - `python -m pytest $WORKSPACE/in/schema_migration/tests` pass karao.
+
+        - Legacy payloads ki backward compatibility rakho aur new schema fields exact banao.
+
+        - Legacy v1 aur already-v2 payloads dono support karo.
+
+        - `migration_notes.md` wale legacy v1.1 aur v1.2 support karo, including nested `customer`, `lines`, `shipTo`, `order_ref`,
+        aur `unit_price_cents`.
+
+        - Unknown v2 metadata fields ko `metadata.unknownFields` mein preserve karo.
+
+        - Legacy payloads ke unmapped extra fields `metadata.unknownFields` mein rakho, lekin `ssn` ya `credit_card` jaise
+        obvious PII keys drop karo.
+
+        - Blank ya null shipping methods ka default `standard` rakho.
+
+        - `convert_many(payloads)` se error aggregation add karo: kam-se-kam `(converted, errors)` return ho aur first bad
+        payload par stop na ho. Har error mein `index`, `path`, aur `error` ho.
+
+        - Warnings generate hon to third item return karo ya compatible result object mein include karo; har warning mein
+        `index`, `path`, aur `warning` ho.
+
+        - `convert_many` call hone par `$WORKSPACE/in/schema_migration/conversion_audit.json` likho, with converted_count,
+        error_count, warning_count, pii_dropped_count, unknown_fields_count.
+
+        - Already-v2 payloads idempotent hon: `metadata.unknownFields` drop na ho aur valid line items rewrite na hon.
+
+        - CLI support add karo taaki `python -m client input.jsonl output.json` JSONL payloads padhe, converted records JSON
+        mein likhe aur audit file `client.py` ke paas likhe.
+
+        - Hidden checks multiple line items, alternate legacy shipping postal fields aur `customer_id` ya `items[0].qty` jaise
+        useful error paths test karenge.
+
+
+        External APIs mat bulao. Converter ko fixture-only hard-coded output se replace mat karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  043-db-migration-safety:
+    source_sha256: 2a3044777e6c4a9805fa3391ab9575dd08a0f0cad50a07417e8da5b7f6170ef0
+    instructions:
+      english: 'The SQLite migration draft at `$WORKSPACE/in/db/migration.sql` is unsafe. It loses data while trying to add
+        account status and email constraints.
+
+
+        Read `$WORKSPACE/in/db/migration_policy.md` before editing. It defines the required dirty-data cleanup, dependent
+        order preservation, transaction, idempotency, and rollback expectations.
+
+
+        Your job:
+
+        - Edit only `$WORKSPACE/in/db/migration.sql`.
+
+        - Do not edit `$WORKSPACE/in/db/schema.sql` or `$WORKSPACE/in/db/migration_policy.md`.
+
+        - Preserve all existing users from `$WORKSPACE/in/db/schema.sql`.
+
+        - Preserve all existing orders and their `user_id` references.
+
+        - Add a non-null `status` column with default `active`.
+
+        - Enforce unique, non-null email addresses for future writes.
+
+        - Keep historical `created_at` values.
+
+        - Existing dirty rows include duplicate, null, and blank emails. Preserve those users by assigning deterministic migrated
+        email values, and document the cleanup.
+
+        - Also create `$WORKSPACE/in/db/preflight_report.md` describing duplicate/null email issues before migration.
+
+        - The preflight report must also mention dependent orders for dirty users `u4`, `u5`, and `u6`.
+
+        - Also create `$WORKSPACE/in/db/rollback.sql` that can restore the pre-migration schema shape with id, email, name,
+        created_at.
+
+        - The rollback script must be executable after the migration and must restore the old schema shape.
+
+        - Also create `$WORKSPACE/in/db/postcheck.sql` with verification queries that can be executed after the migration.
+        It must check row counts, dependent order preservation, cleaned dirty-user emails, and email/status constraints.
+
+        - Also create `$WORKSPACE/in/db/migration_report.md` summarizing the migration strategy, dirty-data cleanup, idempotency
+        approach, rollback limitation/behavior, and the postcheck queries to run.
+
+        - The migration should run inside an explicit transaction and should be idempotent: running it a second time must
+        not corrupt or duplicate user data.
+
+        - Use deterministic cleanup values exactly: duplicate `u4` becomes `ada+u4@example.com`; null email `u5` becomes `missing+u5@example.invalid`;
+        blank email `u6` becomes `missing+u6@example.invalid`.
+
+
+        The migration must run offline in SQLite. Do not use external tools or services.
+
+        '
+      hindi: '`$WORKSPACE/in/db/migration.sql` में SQLite migration draft unsafe है। Account status और email constraints जोड़ते
+        समय यह data खो देता है।
+
+
+        Edit से पहले `migration_policy.md` पढ़ें; यह dirty-data cleanup, dependent order preservation, transaction, idempotency
+        और rollback expectations बताती है।
+
+
+        आपका काम:
+
+        - केवल `$WORKSPACE/in/db/migration.sql` edit करें।
+
+        - `$WORKSPACE/in/db/schema.sql` या `$WORKSPACE/in/db/migration_policy.md` edit न करें।
+
+        - `$WORKSPACE/in/db/schema.sql` के सभी existing users रखें।
+
+        - सभी existing orders और उनके `user_id` references रखें।
+
+        - default `active` वाला non-null `status` column जोड़ें।
+
+        - future writes के लिए unique, non-null email addresses लागू करें।
+
+        - historical `created_at` values रखें।
+
+        - Existing dirty rows में duplicate, null और blank emails हैं। Users को deterministic migrated email देकर preserve
+        करें और cleanup document करें।
+
+        - `$WORKSPACE/in/db/preflight_report.md` बनाएं, जिसमें migration से पहले duplicate/null email issues हों।
+
+        - Preflight report में dirty users `u4`, `u5`, `u6` के dependent orders भी बताएं।
+
+        - `$WORKSPACE/in/db/rollback.sql` बनाएं जो pre-migration schema shape (`id`, `email`, `name`, `created_at`) restore
+        कर सके।
+
+        - Rollback script migration के बाद executable हो और पुराना schema shape restore करे।
+
+        - `$WORKSPACE/in/db/postcheck.sql` बनाएं, जिसमें row counts, dependent order preservation, cleaned dirty-user emails
+        और email/status constraints की verification queries हों।
+
+        - `$WORKSPACE/in/db/migration_report.md` में strategy, dirty-data cleanup, idempotency, rollback limitation/behavior
+        और postcheck queries summarize करें।
+
+        - Migration explicit transaction में चले और idempotent हो: दूसरी बार चलाने पर data corrupt या duplicate न हो।
+
+        - Cleanup values बिल्कुल ऐसे रखें: duplicate `u4` → `ada+u4@example.com`; null `u5` → `missing+u5@example.invalid`;
+        blank `u6` → `missing+u6@example.invalid`।
+
+
+        Migration offline SQLite में चले; external tools/services न लें।'
+      hinglish: '`$WORKSPACE/in/db/migration.sql` ka SQLite migration draft unsafe hai. Account status aur email constraints
+        add karte hue data lose ho raha hai.
+
+
+        Edit se pehle `migration_policy.md` padho; ismein dirty-data cleanup, dependent order preservation, transaction, idempotency
+        aur rollback expectations hain.
+
+
+        Aapka kaam:
+
+        - Sirf `$WORKSPACE/in/db/migration.sql` edit karo.
+
+        - `$WORKSPACE/in/db/schema.sql` ya `$WORKSPACE/in/db/migration_policy.md` edit mat karo.
+
+        - `$WORKSPACE/in/db/schema.sql` ke saare existing users preserve karo.
+
+        - Saare existing orders aur unke `user_id` references preserve karo.
+
+        - Default `active` wala non-null `status` column add karo.
+
+        - Future writes ke liye unique, non-null email addresses enforce karo.
+
+        - Historical `created_at` values retain karo.
+
+        - Dirty rows mein duplicate, null aur blank emails hain. Users ko deterministic migrated email values dekar preserve
+        karo aur cleanup document karo.
+
+        - `$WORKSPACE/in/db/preflight_report.md` banao, jisme migration se pehle duplicate/null email issues hon.
+
+        - Preflight report mein dirty users `u4`, `u5`, `u6` ke dependent orders bhi mention karo.
+
+        - `$WORKSPACE/in/db/rollback.sql` banao jo pre-migration shape (`id`, `email`, `name`, `created_at`) restore kar sake.
+
+        - Rollback script migration ke baad executable ho aur old schema shape restore kare.
+
+        - `$WORKSPACE/in/db/postcheck.sql` mein row counts, dependent order preservation, cleaned dirty-user emails aur email/status
+        constraints ki verification queries likho.
+
+        - `$WORKSPACE/in/db/migration_report.md` mein strategy, dirty-data cleanup, idempotency, rollback limitation/behavior
+        aur postcheck queries summarize karo.
+
+        - Migration explicit transaction ke andar chale aur idempotent ho: second run data corrupt ya duplicate na kare.
+
+        - Cleanup values exact rakho: duplicate `u4` → `ada+u4@example.com`; null `u5` → `missing+u5@example.invalid`; blank
+        `u6` → `missing+u6@example.invalid`.
+
+
+        Migration offline SQLite mein chalni chahiye. External tools/services mat use karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  087-cli-parser-bug-tests:
+    source_sha256: a959672bbbba10aabbd32fddba4b319744f88ca3a6ea8e1f069f71bdd90eec66
+    instructions:
+      english: 'The CSV filtering CLI in `$WORKSPACE/in/csvtool` has parsing bugs around quoted fields, empty results, and
+        descending sort.
+
+
+        Your job:
+
+        - Run `python -m pytest tests` from `$WORKSPACE/in/csvtool`.
+
+        - Fix the CLI implementation.
+
+        - Add focused regression tests for the bug. A good place is `$WORKSPACE/in/csvtool/tests/test_cli_regression.py`.
+
+        - Verify the full test suite passes.
+
+
+        Required CLI behavior:
+
+        - `python -m csvtool.cli samples/orders.csv --where status=paid --select id,total --sort -created_at`
+
+        - Repeating `--where` applies all predicates with AND semantics, for example `--where status=paid --where total=750`.
+
+        - CSV parsing and writing must preserve quoted commas correctly.
+
+        - Empty result sets should still print the selected header and exit 0.
+
+        - `--sort -field` means descending; `--sort field` means ascending. Numeric-looking values should sort numerically.
+
+        - Bad `--where` expressions should exit non-zero with a clear message.
+
+        - Selecting, sorting, or filtering on a missing field should exit non-zero with a clear message.
+
+
+        Constraints:
+
+        - Do not modify existing tests in `tests/test_cli_existing.py`.
+
+        - Do not hard-code sample rows or fixture file paths.
+
+        - Do not introduce pandas, click, or other external dependencies.
+
+        - Do not parse CSV by splitting lines on commas.
+
+        - Do not remove CLI options or bypass filtering.
+
+        '
+      hindi: '`$WORKSPACE/in/csvtool` का CSV filtering CLI quoted fields, empty results और descending sort के आसपास parsing
+        bugs रखता है।
+
+
+        आपका काम:
+
+        - `$WORKSPACE/in/csvtool` से `python -m pytest tests` चलाएँ।
+
+        - CLI implementation ठीक करें।
+
+        - Bug के लिए focused regression tests जोड़ें; अच्छा स्थान `$WORKSPACE/in/csvtool/tests/test_cli_regression.py` है।
+
+        - पूरा test suite पास होने की पुष्टि करें।
+
+
+        आवश्यक CLI behavior:
+
+        - `python -m csvtool.cli samples/orders.csv --where status=paid --select id,total --sort -created_at`
+
+        - एक से अधिक `--where` देने पर सभी predicates AND semantics में लगें, जैसे `--where status=paid --where total=750`।
+
+        - CSV parsing और writing quoted commas को सही तरह preserve करें।
+
+        - Empty result set में भी selected header print हो और exit 0 हो।
+
+        - `--sort -field` descending और `--sort field` ascending हो। Numeric-looking values numeric तरीके से sort हों।
+
+        - गलत `--where` expression clear message के साथ non-zero exit करे।
+
+        - Missing field पर selecting, sorting या filtering clear message के साथ non-zero exit करे।
+
+
+        Constraints:
+
+        - `tests/test_cli_existing.py` में existing tests modify न करें।
+
+        - Sample rows या fixture paths hard-code न करें।
+
+        - pandas, click या अन्य external dependencies न जोड़ें।
+
+        - CSV को lines पर comma से split न करें।
+
+        - CLI options हटाएँ या filtering bypass न करें।'
+      hinglish: '`$WORKSPACE/in/csvtool` ka CSV filtering CLI quoted fields, empty results aur descending sort ke parsing
+        bugs rakhta hai.
+
+
+        Aapka kaam:
+
+        - `$WORKSPACE/in/csvtool` se `python -m pytest tests` run karo.
+
+        - CLI implementation fix karo.
+
+        - Bug ke liye focused regression tests add karo; `$WORKSPACE/in/csvtool/tests/test_cli_regression.py` achhi jagah
+        hai.
+
+        - Full test suite pass verify karo.
+
+
+        Required CLI behavior:
+
+        - `python -m csvtool.cli samples/orders.csv --where status=paid --select id,total --sort -created_at`
+
+        - Repeated `--where` sab predicates ko AND semantics mein apply kare, jaise `--where status=paid --where total=750`.
+
+        - CSV parsing aur writing quoted commas ko correctly preserve kare.
+
+        - Empty result set mein bhi selected header print ho aur exit 0 ho.
+
+        - `--sort -field` descending aur `--sort field` ascending ho; numeric-looking values numerically sort hon.
+
+        - Bad `--where` expression clear message ke saath non-zero exit kare.
+
+        - Missing field par select, sort ya filter karna clear message ke saath non-zero exit kare.
+
+
+        Constraints:
+
+        - `tests/test_cli_existing.py` ke existing tests modify mat karo.
+
+        - Sample rows ya fixture file paths hard-code mat karo.
+
+        - pandas, click ya koi external dependency add mat karo.
+
+        - CSV ko comma se line-split karke parse mat karo.
+
+        - CLI options remove ya filtering bypass mat karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  049-excel-like-cleaning:
+    source_sha256: 9cfc53df6a9f822f1df9ef70a8cbe1949dd7fb9bdb4427210b02ae9e5b1efb91
+    instructions:
+      english: "You are cleaning a messy sales export for a finance reconciliation review. Use only local files.\n\nInputs\
+        \ copied to the workspace root:\n- $WORKSPACE/in/messy_sales.csv\n- $WORKSPACE/in/customer_dictionary.csv\n- $WORKSPACE/in/fx_rates.csv\n\
+        \nCreate exactly these outputs:\n- $WORKSPACE/out/cleaned_sales.csv\n- $WORKSPACE/out/reject_ledger.csv\n- $WORKSPACE/out/reject_summary.json\n\
+        - $WORKSPACE/out/cleaning_report.md\n\nCleaning rules:\n1. Do not modify input files.\n2. Validate customer_id against\
+        \ customer_dictionary.csv. Reject rows whose customer_id is unknown or inactive.\n3. Parse order_date using the row\
+        \ locale:\n   - en_US dates are month/day/year.\n   - en_GB and de_DE dates are day/month/year.\n   - ISO dates are\
+        \ already year-month-day.\n   - Dates with month names such as \"10-Jan-2025\" are valid.\n4. Normalize status to\
+        \ lowercase. Refund/returned rows must keep a negative amount_usd.\n5. Normalize amount to USD using fx_rates.csv.\
+        \ The amount field is already the row total, not a unit price. Strip currency symbols and accounting parentheses.\
+        \ For en_US/en_GB, comma is the thousands separator and dot is the decimal separator. For de_DE, dot is the thousands\
+        \ separator and comma is the decimal separator. Round amount_usd to exactly two decimals.\n6. Quantity must be a positive\
+        \ integer.\n7. Deduplicate by order_id after validation. Keep the first valid occurrence in input order and reject\
+        \ later valid duplicates with reason duplicate_order_id. Invalid rows are rejected for their validation reason rather\
+        \ than duplicate_order_id.\n8. Reject rows with invalid dates, unsupported currency, missing/non-numeric amounts,\
+        \ invalid quantities, unknown/inactive customers, or duplicates.\n9. If a row has multiple reject reasons, record\
+        \ the first applicable reason in this priority order:\n   missing_amount, unsupported_currency, invalid_quantity,\
+        \ inactive_customer, unknown_customer, invalid_date, duplicate_order_id.\n10. Refund/returned rows must produce a\
+        \ negative amount_usd exactly once: a positive returned amount becomes negative, and an already-negative returned\
+        \ amount stays negative.\n\ncleaned_sales.csv requirements:\n- Exact header:\n  order_id,order_date,customer_id,customer_name,sku,quantity,amount_usd,status\n\
+        - Rows must be sorted by order_date then order_id.\n- Do not include extra columns.\n\nreject_ledger.csv requirements:\n\
+        - Exact header:\n  order_id,reason,source_row,notes\n- Include one row per rejected input row. source_row is 1-based\
+        \ data-row number from messy_sales.csv, excluding the header.\n- Use one of the reason codes listed in rule 9.\n\n\
+        reject_summary.json requirements:\n- Valid JSON object keyed by every reason code in rule 9, including zero-count\
+        \ reasons if any.\n- Each reason entry must contain count, source_rows, and order_ids.\n- source_rows must be numeric\
+        \ arrays in ascending input order.\n\ncleaning_report.md requirements:\n- Summarize valid row count, rejected row\
+        \ count, duplicate count, and total amount_usd.\n- Explain each reject reason category.\n- Mention any locale or FX\
+        \ assumptions used.\n\nDo not use network access or external APIs.\n"
+      hindi: 'आप finance reconciliation review के लिए messy sales export साफ कर रहे हैं। केवल local files उपयोग करें।
+
+
+        Workspace root में copy किए गए inputs:
+
+        - `$WORKSPACE/in/messy_sales.csv`
+
+        - `$WORKSPACE/in/customer_dictionary.csv`
+
+        - `$WORKSPACE/in/fx_rates.csv`
+
+
+        ठीक ये outputs बनाएँ:
+
+        - `$WORKSPACE/out/cleaned_sales.csv`
+
+        - `$WORKSPACE/out/reject_ledger.csv`
+
+        - `$WORKSPACE/out/reject_summary.json`
+
+        - `$WORKSPACE/out/cleaning_report.md`
+
+
+        Cleaning rules:
+
+        1. Input files modify न करें।
+
+        2. `customer_dictionary.csv` से customer_id validate करें। Unknown या inactive customer वाली rows reject करें।
+
+        3. Row locale से order_date parse करें: `en_US` month/day/year है; `en_GB` और `de_DE` day/month/year हैं; ISO dates
+        year-month-day हैं; `10-Jan-2025` जैसे month-name dates valid हैं।
+
+        4. status को lowercase करें। Refund/returned rows में negative amount_usd रखना है।
+
+        5. `fx_rates.csv` से amount को USD में normalize करें। amount row total है, unit price नहीं। Currency symbols और accounting
+        parentheses हटाएँ। `en_US`/`en_GB` में comma thousands separator और dot decimal separator है; `de_DE` में dot thousands
+        और comma decimal separator है। amount_usd को ठीक two decimals तक round करें।
+
+        6. Quantity positive integer हो।
+
+        7. Validation के बाद order_id से deduplicate करें। Input order में पहली valid occurrence रखें और बाद की valid duplicates
+        को `duplicate_order_id` reason से reject करें। Invalid rows को `duplicate_order_id` के बजाय उनका validation reason
+        दें।
+
+        8. Invalid dates, unsupported currency, missing/non-numeric amounts, invalid quantities, unknown/inactive customers
+        या duplicates reject करें।
+
+        9. Multiple reject reasons हों तो पहला reason इस priority में लें: `missing_amount`, `unsupported_currency`, `invalid_quantity`,
+        `inactive_customer`, `unknown_customer`, `invalid_date`, `duplicate_order_id`।
+
+        10. Refund/returned rows का amount_usd ठीक एक बार negative हो: positive returned amount negative बने और already-negative
+        returned amount वैसा ही रहे।
+
+
+        `cleaned_sales.csv` requirements:
+
+        - Exact header: `order_id,order_date,customer_id,customer_name,sku,quantity,amount_usd,status`
+
+        - Rows `order_date` फिर `order_id` से sorted हों।
+
+        - Extra columns न हों।
+
+
+        `reject_ledger.csv` requirements:
+
+        - Exact header: `order_id,reason,source_row,notes`
+
+        - हर rejected input row की एक row हो। source_row `messy_sales.csv` की header छोड़कर 1-based data-row number है।
+
+        - Rule 9 में दिए reason codes में से एक उपयोग करें।
+
+
+        `reject_summary.json` requirements:
+
+        - Valid JSON object हो, जिसमें rule 9 का हर reason code हो, zero-count reasons भी।
+
+        - हर reason entry में count, source_rows और order_ids हों।
+
+        - source_rows ascending numeric arrays हों।
+
+
+        `cleaning_report.md` में valid/rejected row count, duplicate count, total amount_usd, हर reject category और locale/FX
+        assumptions बताएं।
+
+
+        Network या external APIs न लें।'
+      hinglish: 'Aap finance reconciliation review ke liye messy sales export clean kar rahe ho. Sirf local files use karo.
+
+
+        Workspace root mein copied inputs:
+
+        - `$WORKSPACE/in/messy_sales.csv`
+
+        - `$WORKSPACE/in/customer_dictionary.csv`
+
+        - `$WORKSPACE/in/fx_rates.csv`
+
+
+        Exactly ye outputs banao:
+
+        - `$WORKSPACE/out/cleaned_sales.csv`
+
+        - `$WORKSPACE/out/reject_ledger.csv`
+
+        - `$WORKSPACE/out/reject_summary.json`
+
+        - `$WORKSPACE/out/cleaning_report.md`
+
+
+        Cleaning rules:
+
+        1. Input files modify mat karo.
+
+        2. `customer_dictionary.csv` se customer_id validate karo; unknown ya inactive customer rows reject karo.
+
+        3. Row locale ke hisaab se order_date parse karo: `en_US` month/day/year, `en_GB` aur `de_DE` day/month/year, ISO
+        year-month-day; `10-Jan-2025` jaise month-name dates valid hain.
+
+        4. status lowercase karo. Refund/returned rows mein negative amount_usd rakho.
+
+        5. `fx_rates.csv` use karke amount ko USD mein normalize karo. amount row total hai, unit price nahi. Currency symbols
+        aur accounting parentheses strip karo. `en_US`/`en_GB` mein comma thousands aur dot decimal separator; `de_DE` mein
+        dot thousands aur comma decimal separator hai. amount_usd ko exactly two decimals round karo.
+
+        6. Quantity positive integer honi chahiye.
+
+        7. Validation ke baad order_id par deduplicate karo. Input order ki first valid occurrence rakho; baad ki valid duplicates
+        ko `duplicate_order_id` reason se reject karo. Invalid rows ko duplicate reason ke badle unka validation reason do.
+
+        8. Invalid dates, unsupported currency, missing/non-numeric amounts, invalid quantities, unknown/inactive customers
+        ya duplicates reject karo.
+
+        9. Multiple reject reasons hon to priority ke mutabik pehla lo: `missing_amount`, `unsupported_currency`, `invalid_quantity`,
+        `inactive_customer`, `unknown_customer`, `invalid_date`, `duplicate_order_id`.
+
+        10. Refund/returned rows mein amount_usd exactly once negative ho: positive returned amount negative bano aur already-negative
+        returned amount same rahe.
+
+
+        `cleaned_sales.csv` requirements:
+
+        - Exact header: `order_id,order_date,customer_id,customer_name,sku,quantity,amount_usd,status`
+
+        - Rows ko `order_date` phir `order_id` se sort karo.
+
+        - Extra columns mat add karo.
+
+
+        `reject_ledger.csv` requirements:
+
+        - Exact header: `order_id,reason,source_row,notes`
+
+        - Har rejected input row ki ek row ho; source_row `messy_sales.csv` ke header ko chhodkar 1-based data-row number
+        hai.
+
+        - Rule 9 ke reason codes mein se ek use karo.
+
+
+        `reject_summary.json` valid JSON object ho jisme Rule 9 ka har reason code ho, zero-count bhi. Har entry mein count,
+        source_rows, order_ids hon; source_rows ascending numeric arrays hon.
+
+
+        `cleaning_report.md` mein valid/rejected counts, duplicate count, total amount_usd, har reject category aur locale/FX
+        assumptions summarize karo.
+
+
+        Network ya external APIs use mat karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  050-multitable-join-analysis:
+    source_sha256: 813e8e700777391ae7b4eae34b9c760966bf9b2225ae81672dd02a801e106f31
+    instructions:
+      english: "Build customer-level revenue metrics and a reconciliation note from local tables.\n\nInputs copied to the\
+        \ workspace root:\n- $WORKSPACE/in/customers.csv\n- $WORKSPACE/in/orders.csv\n- $WORKSPACE/in/payments.csv\n- $WORKSPACE/in/refunds.csv\n\
+        - $WORKSPACE/in/fx_rates.csv\n- $WORKSPACE/in/chargebacks.csv\n\nCreate:\n- $WORKSPACE/out/customer_metrics.csv\n\
+        - $WORKSPACE/out/region_summary.json\n- $WORKSPACE/out/reconciliation_audit.json\n- $WORKSPACE/out/reconciliation_notes.md\n\
+        \ncustomer_metrics.csv columns, in this exact order:\ncanonical_customer_id,name,region,order_count,gross_revenue_usd,refund_amount_usd,chargeback_amount_usd,net_revenue_usd,segment\n\
+        Rows must be sorted by canonical_customer_id ascending.\n\nBusiness rules:\n1. Do not modify input files.\n2. Roll\
+        \ up aliases using customers.csv canonical_customer_id. Output one row per canonical customer, including canonical\
+        \ customers with no valid revenue.\n3. `order_count` counts distinct `order_id` values whose `order_status` is paid\
+        \ and that have at least one captured payment. Multiple captured payment rows for the same order still count as one\
+        \ order.\n4. Gross revenue comes from captured payments, not from order_amount. Ignore duplicate payment rows only\
+        \ when `(order_id, amount, currency, status)` all match; captured payments for the same order with different amounts\
+        \ are additive.\n5. Convert payments, refunds, and chargebacks to USD using fx_rates.csv.\n6. Captured payments that\
+        \ reference a missing order_id are orphan payments. Do not count them as revenue, but list them in reconciliation_notes.md.\n\
+        7. Refunds count only when they reference an order that is both paid and included through captured payment revenue.\
+        \ Orphan refunds, refunds for cancelled orders, and refunds for orders without captured revenue are anomalies, not\
+        \ revenue deductions.\n8. Chargebacks count only when they reference an included paid/captured order and status is\
+        \ won_by_customer. won_by_merchant chargebacks are reconciliation notes but not revenue deductions.\n9. Net revenue\
+        \ = gross revenue - refunds - chargebacks.\n10. Format money fields with exactly two decimals.\n11. Segment canonical\
+        \ customers as:\n   - platinum when net_revenue_usd >= 500\n   - gold when net_revenue_usd >= 250 and < 500\n   -\
+        \ silver when net_revenue_usd > 0 and < 250\n   - dormant when net_revenue_usd == 0\n\nregion_summary.json requirements:\n\
+        - Valid JSON object keyed by region.\n- Each region entry must include canonical_customer_count, gross_revenue_usd,\
+        \ net_revenue_usd.\n\nreconciliation_notes.md requirements:\n- Explain the revenue basis.\n- List duplicate payments,\
+        \ orphan payments, orphan refunds, refunds against cancelled/no-captured orders, and chargebacks.\n- Mention the canonical\
+        \ customer merge.\n\nreconciliation_audit.json requirements:\n- Valid JSON with keys: duplicate_payment_ids, orphan_payment_ids,\
+        \ refund_anomaly_ids, included_chargeback_ids, excluded_chargeback_ids, alias_customer_ids.\n- Each value must be\
+        \ an array of IDs sorted ascending.\n- duplicate_payment_ids are duplicate captured payment rows ignored by the tuple\
+        \ rule.\n- refund_anomaly_ids include orphan refunds, refunds for cancelled orders, and refunds for orders without\
+        \ captured revenue.\n- excluded_chargeback_ids include chargebacks that are not deducted because the order is not\
+        \ included or the chargeback status is not won_by_customer.\n\nDo not use network access. Do not add extra columns\
+        \ to customer_metrics.csv.\n"
+      hindi: 'Local tables से customer-level revenue metrics और reconciliation note बनाएं।
+
+
+        Inputs:
+
+        - `$WORKSPACE/in/customers.csv`
+
+        - `$WORKSPACE/in/orders.csv`
+
+        - `$WORKSPACE/in/payments.csv`
+
+        - `$WORKSPACE/in/refunds.csv`
+
+        - `$WORKSPACE/in/fx_rates.csv`
+
+        - `$WORKSPACE/in/chargebacks.csv`
+
+
+        बनाएँ:
+
+        - `$WORKSPACE/out/customer_metrics.csv`
+
+        - `$WORKSPACE/out/region_summary.json`
+
+        - `$WORKSPACE/out/reconciliation_audit.json`
+
+        - `$WORKSPACE/out/reconciliation_notes.md`
+
+
+        `customer_metrics.csv` में columns इसी exact order में हों: `canonical_customer_id,name,region,order_count,gross_revenue_usd,refund_amount_usd,chargeback_amount_usd,net_revenue_usd,segment`।
+        Rows `canonical_customer_id` ascending हों।
+
+
+        Business rules:
+
+        1. Input files modify न करें।
+
+        2. `customers.csv` के canonical_customer_id से aliases roll up करें। हर canonical customer की एक row दें, valid revenue
+        न होने पर भी।
+
+        3. `order_count` distinct `order_id` गिने: `order_status` paid हो और कम-से-कम एक captured payment हो। एक order की
+        multiple captured payment rows फिर भी एक order हैं।
+
+        4. Gross revenue captured payments से आए, `order_amount` से नहीं। Duplicate payment rows तभी ignore करें जब `(order_id,
+        amount, currency, status)` सभी match करें; अलग amount वाली captured payments additive हैं।
+
+        5. Payments, refunds और chargebacks को `fx_rates.csv` से USD में बदलें।
+
+        6. Missing order_id वाले captured payments orphan payments हैं। Revenue में न गिनें, लेकिन `reconciliation_notes.md`
+        में list करें।
+
+        7. Refund तभी count करें जब वह paid order को reference करे और captured payment revenue में included हो। Orphan refunds,
+        cancelled orders के refunds और बिना captured revenue वाले refunds anomalies हैं, revenue deduction नहीं।
+
+        8. Chargeback तभी count करें जब included paid/captured order को reference करे और status `won_by_customer` हो। `won_by_merchant`
+        chargebacks notes में आएँ, revenue deduction नहीं।
+
+        9. Net revenue = gross revenue - refunds - chargebacks।
+
+        10. Money fields ठीक two decimals में format हों।
+
+        11. Segment: platinum जब net_revenue_usd >= 500; gold जब >= 250 और < 500; silver जब > 0 और < 250; dormant जब == 0।
+
+
+        `region_summary.json` region-keyed valid JSON हो; हर region में canonical_customer_count, gross_revenue_usd, net_revenue_usd
+        हों।
+
+
+        `reconciliation_notes.md` revenue basis, duplicate/orphan payments, orphan refunds, cancelled/no-captured refunds,
+        chargebacks और canonical customer merge समझाए।
+
+
+        `reconciliation_audit.json` में keys `duplicate_payment_ids`, `orphan_payment_ids`, `refund_anomaly_ids`, `included_chargeback_ids`,
+        `excluded_chargeback_ids`, `alias_customer_ids` हों। हर value ascending sorted IDs की array हो।
+
+
+        Network न लें और `customer_metrics.csv` में extra columns न जोड़ें।'
+      hinglish: 'Local tables se customer-level revenue metrics aur reconciliation note banao.
+
+
+        Inputs:
+
+        - `$WORKSPACE/in/customers.csv`
+
+        - `$WORKSPACE/in/orders.csv`
+
+        - `$WORKSPACE/in/payments.csv`
+
+        - `$WORKSPACE/in/refunds.csv`
+
+        - `$WORKSPACE/in/fx_rates.csv`
+
+        - `$WORKSPACE/in/chargebacks.csv`
+
+
+        Create:
+
+        - `$WORKSPACE/out/customer_metrics.csv`
+
+        - `$WORKSPACE/out/region_summary.json`
+
+        - `$WORKSPACE/out/reconciliation_audit.json`
+
+        - `$WORKSPACE/out/reconciliation_notes.md`
+
+
+        `customer_metrics.csv` columns exact order mein hon: `canonical_customer_id,name,region,order_count,gross_revenue_usd,refund_amount_usd,chargeback_amount_usd,net_revenue_usd,segment`.
+        Rows `canonical_customer_id` ascending sort hon.
+
+
+        Business rules:
+
+        1. Input files modify mat karo.
+
+        2. `customers.csv` ke canonical_customer_id se aliases roll up karo; har canonical customer ki row do, chahe valid
+        revenue na ho.
+
+        3. `order_count` distinct `order_id` count kare jab `order_status` paid ho aur kam-se-kam ek captured payment ho.
+        Same order ki multiple captured payment rows phir bhi ek order count hon.
+
+        4. Gross revenue captured payments se lo, `order_amount` se nahi. Duplicate payment rows sirf tab ignore karo jab
+        `(order_id, amount, currency, status)` sab match karein; different amounts wali captured payments additive hain.
+
+        5. Payments, refunds aur chargebacks ko `fx_rates.csv` se USD mein convert karo.
+
+        6. Missing order_id wale captured payments orphan payments hain: revenue mein count mat karo, par `reconciliation_notes.md`
+        mein list karo.
+
+        7. Refund tab count karo jab paid order reference ho aur captured payment revenue mein included ho. Orphan refunds,
+        cancelled orders ke refunds aur no-captured-revenue refunds anomalies hain, deductions nahi.
+
+        8. Chargeback tab count karo jab included paid/captured order reference ho aur status `won_by_customer` ho. `won_by_merchant`
+        notes mein aaye, deduction nahi.
+
+        9. Net revenue = gross revenue - refunds - chargebacks.
+
+        10. Money fields exactly two decimals format karo.
+
+        11. Segment rules: net_revenue_usd >= 500 par platinum; >= 250 aur < 500 par gold; > 0 aur < 250 par silver; == 0
+        par dormant.
+
+
+        `region_summary.json` region-keyed valid JSON ho; har entry mein canonical_customer_count, gross_revenue_usd, net_revenue_usd
+        hon.
+
+
+        `reconciliation_notes.md` revenue basis, duplicate/orphan payments, orphan refunds, cancelled/no-captured refunds,
+        chargebacks aur canonical customer merge explain kare.
+
+
+        `reconciliation_audit.json` keys `duplicate_payment_ids`, `orphan_payment_ids`, `refund_anomaly_ids`, `included_chargeback_ids`,
+        `excluded_chargeback_ids`, `alias_customer_ids` rakhe. Har value ascending sorted IDs ki array ho.
+
+
+        Network use mat karo aur `customer_metrics.csv` mein extra columns mat add karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  051-sql-query-report:
+    source_sha256: 404e4dd3362e063e604f8c28b2554f38a0c587d2e28ac19b3180bea9785cad52
+    instructions:
+      english: "Use the offline SQL fixture to produce a small BI report.\n\nInput:\n- $WORKSPACE/in/schema_data.sql\n\nCreate:\n\
+        - $WORKSPACE/out/query_results.json\n- $WORKSPACE/out/analysis.md\n- $WORKSPACE/out/query_audit.json\n\nRequirements:\n\
+        1. Load schema_data.sql into a local SQLite database or otherwise execute equivalent SQL locally.\n2. Consider only\
+        \ orders where status = 'paid' and order_date is from 2025-01-01 through 2025-03-31 inclusive.\n3. query_results.json\
+        \ must be valid JSON with exactly these top-level keys:\n   - top_products_by_revenue\n   - revenue_by_region\n  \
+        \ - category_summary\n4. top_products_by_revenue must contain the top 3 products by revenue, descending, with fields:\n\
+        \   product_id, product_name, revenue\n   Break revenue ties by product_id ascending.\n5. revenue_by_region must contain\
+        \ one row per customer region with fields:\n   region, order_count, revenue\n   Sort region rows by region ascending.\n\
+        6. category_summary must contain one row per product category with fields:\n   category, units_sold, revenue\n   Sort\
+        \ category rows by category ascending.\n7. Revenue values must be numbers or numeric strings rounded to two decimal\
+        \ places.\n8. analysis.md must briefly identify the top product, highest revenue region, tie handling if any, and\
+        \ excluded records rule.\n9. The date window includes 2025-01-01 and 2025-03-31. Exclude returned, cancelled, and\
+        \ out-of-window orders even if they have large order_items.\n\nquery_audit.json requirements:\n- Valid JSON with keys:\
+        \ included_order_ids, excluded_status_order_ids, excluded_out_of_window_order_ids, boundary_included_order_ids, top_product_tie_order.\n\
+        - The first four keys must be arrays of order_id strings sorted ascending.\n- top_product_tie_order must list the\
+        \ product_ids that are tied by revenue in the exact output order used for top_products_by_revenue.\n\nDo not modify\
+        \ fixtures. Do not use network access or external APIs.\n"
+      hindi: 'Offline SQL fixture से एक छोटा BI report बनाएं।
+
+
+        Input: `$WORKSPACE/in/schema_data.sql`
+
+
+        बनाएँ:
+
+        - `$WORKSPACE/out/query_results.json`
+
+        - `$WORKSPACE/out/analysis.md`
+
+        - `$WORKSPACE/out/query_audit.json`
+
+
+        आवश्यकताएँ:
+
+        1. `schema_data.sql` को local SQLite database में load करें या equivalent SQL locally execute करें।
+
+        2. केवल वे orders लें जिनका status `paid` है और order_date 2025-01-01 से 2025-03-31 inclusive है।
+
+        3. `query_results.json` valid JSON हो और top-level पर ठीक ये keys हों: `top_products_by_revenue`, `revenue_by_region`,
+        `category_summary`।
+
+        4. `top_products_by_revenue` revenue के अनुसार descending top 3 products रखे; fields `product_id`, `product_name`,
+        `revenue` हों। Tie होने पर `product_id` ascending से break करें।
+
+        5. `revenue_by_region` में हर customer region की एक row हो; fields `region`, `order_count`, `revenue` हों; region
+        ascending sort हो।
+
+        6. `category_summary` में हर product category की एक row हो; fields `category`, `units_sold`, `revenue` हों; category
+        ascending sort हो।
+
+        7. Revenue values numbers या दो decimal places वाले numeric strings हों।
+
+        8. `analysis.md` में top product, highest revenue region, tie handling और excluded-record rule briefly बताएं।
+
+        9. Date window में 2025-01-01 और 2025-03-31 शामिल हैं। Returned, cancelled और out-of-window orders को exclude करें,
+        भले उनके order_items बड़े हों।
+
+
+        `query_audit.json` keys रखे: `included_order_ids`, `excluded_status_order_ids`, `excluded_out_of_window_order_ids`,
+        `boundary_included_order_ids`, `top_product_tie_order`। पहले चार keys ascending sorted order_id strings की arrays
+        हों। `top_product_tie_order` में top_products_by_revenue के exact output order में tied product_ids हों।
+
+
+        Fixtures modify न करें और network/external APIs न लें।'
+      hinglish: 'Offline SQL fixture se ek chhota BI report banao.
+
+
+        Input: `$WORKSPACE/in/schema_data.sql`
+
+
+        Create:
+
+        - `$WORKSPACE/out/query_results.json`
+
+        - `$WORKSPACE/out/analysis.md`
+
+        - `$WORKSPACE/out/query_audit.json`
+
+
+        Requirements:
+
+        1. `schema_data.sql` ko local SQLite database mein load karo ya equivalent SQL locally execute karo.
+
+        2. Sirf status `paid` wale orders lo jinka order_date 2025-01-01 se 2025-03-31 inclusive ho.
+
+        3. `query_results.json` valid JSON ho aur exact top-level keys `top_products_by_revenue`, `revenue_by_region`, `category_summary`
+        hon.
+
+        4. `top_products_by_revenue` mein revenue descending top 3 products hon, fields `product_id`, `product_name`, `revenue`;
+        tie ko `product_id` ascending se break karo.
+
+        5. `revenue_by_region` mein har customer region ki row ho, fields `region`, `order_count`, `revenue`; rows region
+        ascending sort hon.
+
+        6. `category_summary` mein har product category ki row ho, fields `category`, `units_sold`, `revenue`; rows category
+        ascending sort hon.
+
+        7. Revenue values numbers ya exactly two-decimal numeric strings ho.
+
+        8. `analysis.md` mein top product, highest revenue region, tie handling aur excluded-record rule briefly identify
+        karo.
+
+        9. Date window 2025-01-01 aur 2025-03-31 ko include karta hai. Returned, cancelled aur out-of-window orders exclude
+        karo, chahe unke order_items bade hon.
+
+
+        `query_audit.json` mein keys `included_order_ids`, `excluded_status_order_ids`, `excluded_out_of_window_order_ids`,
+        `boundary_included_order_ids`, `top_product_tie_order` hon. Pehle four keys ascending order_id strings arrays hon.
+        `top_product_tie_order` mein output ke exact order mein tied product_ids hon.
+
+
+        Fixtures modify mat karo; network ya external APIs use mat karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  053-anomalous-transaction-detect:
+    source_sha256: e9e3506a40a234fae05b31c197ee72222ee2b92151f5a1439dd43c2c02d50b5b
+    instructions:
+      english: 'Detect suspicious transactions using the local rulebook.
+
+
+        Inputs:
+
+        - $WORKSPACE/in/transactions.csv
+
+        - $WORKSPACE/in/rules.md
+
+
+        Create:
+
+        - $WORKSPACE/out/suspicious_transactions.csv
+
+        - $WORKSPACE/out/rule_audit.json
+
+        - $WORKSPACE/out/case_notes.md
+
+
+        suspicious_transactions.csv columns, in this exact order:
+
+        transaction_id,customer_id,rule_id,risk_level,reason
+
+
+        Rules:
+
+        1. Do not modify fixtures.
+
+        2. Apply only the rules in rules.md.
+
+        3. Include every transaction that triggers at least one rule.
+
+        4. If a transaction triggers multiple rules, use the highest-risk rule and mention other triggered rule ids in reason.
+
+        5. Do not include transactions that do not trigger any rule.
+
+        6. For card velocity, evaluate transactions by timestamp, not CSV row order.
+
+        7. case_notes.md must summarize the number of suspicious transactions and mention each triggered rule_id.
+
+
+        rule_audit.json requirements:
+
+        - Valid JSON with keys: suspicious_transaction_ids, non_suspicious_transaction_ids, rule_counts, secondary_rule_ids.
+
+        - suspicious_transaction_ids and non_suspicious_transaction_ids must be sorted arrays.
+
+        - rule_counts maps each rule_id to the number of suspicious transactions whose primary rule_id is that rule.
+
+        - secondary_rule_ids maps only multi-rule transaction_ids to sorted arrays of the other triggered rule ids mentioned
+        in the CSV reason.
+
+
+        Do not use network access or external APIs.
+
+        '
+      hindi: 'Local rulebook का उपयोग करके suspicious transactions detect करें।
+
+
+        Inputs:
+
+        - `$WORKSPACE/in/transactions.csv`
+
+        - `$WORKSPACE/in/rules.md`
+
+
+        बनाएँ:
+
+        - `$WORKSPACE/out/suspicious_transactions.csv`
+
+        - `$WORKSPACE/out/rule_audit.json`
+
+        - `$WORKSPACE/out/case_notes.md`
+
+
+        `suspicious_transactions.csv` columns इसी exact order में हों: `transaction_id,customer_id,rule_id,risk_level,reason`।
+
+
+        Rules:
+
+        1. Fixtures modify न करें।
+
+        2. केवल `rules.md` के rules apply करें।
+
+        3. कम-से-कम एक rule trigger करने वाली हर transaction include करें।
+
+        4. Multiple rules trigger हों तो highest-risk rule चुनें और reason में बाकी triggered rule ids लिखें।
+
+        5. कोई rule trigger न करने वाली transactions include न करें।
+
+        6. Card velocity के लिए CSV row order नहीं, timestamp से transactions evaluate करें।
+
+        7. `case_notes.md` में suspicious transaction count summarize करें और हर triggered rule_id mention करें।
+
+
+        `rule_audit.json` valid JSON हो और keys `suspicious_transaction_ids`, `non_suspicious_transaction_ids`, `rule_counts`,
+        `secondary_rule_ids` हों। पहले दो sorted arrays हों। `rule_counts` हर rule_id को उस rule को primary rule बनाने वाली
+        suspicious transactions की संख्या से map करे। `secondary_rule_ids` केवल multi-rule transaction_ids के लिए sorted arrays
+        रखे, और वही ids CSV reason में हों।
+
+
+        Network या external APIs न लें।'
+      hinglish: 'Local rulebook use karke suspicious transactions detect karo.
+
+
+        Inputs:
+
+        - `$WORKSPACE/in/transactions.csv`
+
+        - `$WORKSPACE/in/rules.md`
+
+
+        Create:
+
+        - `$WORKSPACE/out/suspicious_transactions.csv`
+
+        - `$WORKSPACE/out/rule_audit.json`
+
+        - `$WORKSPACE/out/case_notes.md`
+
+
+        `suspicious_transactions.csv` columns exact order mein: `transaction_id,customer_id,rule_id,risk_level,reason`.
+
+
+        Rules:
+
+        1. Fixtures modify mat karo.
+
+        2. Sirf `rules.md` ke rules apply karo.
+
+        3. Har transaction include karo jo kam-se-kam ek rule trigger kare.
+
+        4. Multiple rules hon to highest-risk rule use karo aur reason mein baaki triggered rule ids mention karo.
+
+        5. Koi rule trigger na karne wali transactions include mat karo.
+
+        6. Card velocity ko CSV row order se nahi, timestamp ke basis par evaluate karo.
+
+        7. `case_notes.md` mein suspicious count summarize karo aur har triggered rule_id mention karo.
+
+
+        `rule_audit.json` valid JSON ho, keys `suspicious_transaction_ids`, `non_suspicious_transaction_ids`, `rule_counts`,
+        `secondary_rule_ids`. Pehle do sorted arrays hon. `rule_counts` har rule_id ko primary rule wali suspicious transactions
+        ke count se map kare. `secondary_rule_ids` sirf multi-rule transaction_ids ke liye sorted arrays rakhe aur CSV reason
+        mein wahi ids hon.
+
+
+        Network ya external APIs use mat karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  054-budget-variance-analysis:
+    source_sha256: ed8b6607c1a3aa37d6966aca8d69d98c4daf1dd6ac019add2365049ea13813a6
+    instructions:
+      english: "Prepare a budget-vs-actuals variance report.\n\nInputs:\n- $WORKSPACE/in/budget.csv\n- $WORKSPACE/in/actuals.csv\n\
+        \nCreate:\n- $WORKSPACE/out/variance_report.csv\n- $WORKSPACE/out/department_rollup.csv\n- $WORKSPACE/out/review_reasons.json\n\
+        - $WORKSPACE/out/summary.md\n\nvariance_report.csv columns, in this exact order:\ndepartment,category,budget_amount,actual_amount,variance_amount,variance_pct,flag\n\
+        \nRules:\n1. Do not modify fixtures.\n2. Use a full outer join across budget.csv and actuals.csv by department and\
+        \ category.\n   - If a budget row has no matching actual row, set actual_amount to 0.00.\n   - If an actual row has\
+        \ no matching budget row, include it as an unplanned item with budget_amount 0.00.\n3. variance_amount = actual_amount\
+        \ - budget_amount.\n4. variance_pct = variance_amount / budget_amount * 100.\n   - If budget_amount is 0.00 and actual_amount\
+        \ is nonzero, set variance_pct to N/A and flag review.\n   - If both budget_amount and actual_amount are 0.00, set\
+        \ variance_pct to 0.00 and flag ok.\n5. Format amount fields with exactly two decimals and variance_pct with exactly\
+        \ two decimals.\n6. flag must be review when absolute variance_pct is strictly greater than 10.00, otherwise ok. Exactly\
+        \ 10.00 is ok.\n7. summary.md must name every review item and the largest overrun by variance_amount.\n8. summary.md\
+        \ must mention any unplanned actuals, zero-budget rows, or missing actuals.\n\ndepartment_rollup.csv requirements:\n\
+        - Exact header:\n  department,budget_amount,actual_amount,variance_amount,variance_pct,review_item_count,rollup_flag\n\
+        - Sum all variance_report.csv rows by department after the full outer join logic.\n- variance_pct is department variance_amount\
+        \ / department budget_amount * 100.\n- If department budget_amount is 0.00 and actual_amount is nonzero, variance_pct\
+        \ is N/A.\n- review_item_count is the number of category rows in that department with flag=review.\n- rollup_flag\
+        \ is review when review_item_count > 0, otherwise ok.\n- Sort rows by department ascending.\n\nreview_reasons.json\
+        \ requirements:\n- Valid JSON object keyed by each review item as `\"Department Category\"`.\n- Each value must contain\
+        \ reason_type and primary_driver.\n- reason_type must be one of: overrun_pct, underrun_pct, unplanned_actual, missing_actual,\
+        \ zero_budget_actual.\n- primary_driver should briefly identify the rule that caused the review flag, such as `variance_pct\
+        \ > 10`, `variance_pct < -10`, `budget missing`, `actual missing`, or `budget is zero with actual spend`.\n\nDo not\
+        \ use network access or external APIs.\n"
+      hindi: 'Budget और actuals की variance report तैयार करें।
+
+
+        Inputs:
+
+        - `$WORKSPACE/in/budget.csv`
+
+        - `$WORKSPACE/in/actuals.csv`
+
+
+        बनाएँ:
+
+        - `$WORKSPACE/out/variance_report.csv`
+
+        - `$WORKSPACE/out/department_rollup.csv`
+
+        - `$WORKSPACE/out/review_reasons.json`
+
+        - `$WORKSPACE/out/summary.md`
+
+
+        `variance_report.csv` columns exact order में: `department,category,budget_amount,actual_amount,variance_amount,variance_pct,flag`।
+
+
+        Rules:
+
+        1. Input files modify न करें।
+
+        2. department और category पर budget.csv तथा actuals.csv का full outer join करें। Budget row का matching actual न हो
+        तो actual_amount 0.00 रखें। Actual row का budget न हो तो budget_amount 0.00 वाला unplanned item include करें।
+
+        3. variance_amount = actual_amount - budget_amount।
+
+        4. variance_pct = variance_amount / budget_amount * 100। यदि budget_amount 0.00 और actual_amount nonzero हो तो variance_pct
+        N/A और flag review; यदि दोनों 0.00 हों तो variance_pct 0.00 और flag ok।
+
+        5. Amount fields ठीक two decimals और variance_pct ठीक two decimals में format करें।
+
+        6. Absolute variance_pct strictly 10.00 से बड़ा हो तो flag review, अन्यथा ok। ठीक 10.00 ok है।
+
+        7. `summary.md` में हर review item और variance_amount का largest overrun नाम दें।
+
+        8. Unplanned actuals, zero-budget rows और missing actuals बताएं।
+
+
+        `department_rollup.csv` exact header: `department,budget_amount,actual_amount,variance_amount,variance_pct,review_item_count,rollup_flag`।
+        Full outer join के बाद `variance_report.csv` rows को department से sum करें। variance_pct department variance_amount
+        / department budget_amount * 100 हो। Zero budget और nonzero actual पर N/A हो। review_item_count उस department की `flag=review`
+        category rows की संख्या हो। review_item_count > 0 पर rollup_flag review, अन्यथा ok। Rows department ascending हों।
+
+
+        `review_reasons.json` valid JSON object हो, हर review item को `"Department Category"` key से रखे। हर value में reason_type
+        और primary_driver हों। reason_type केवल `overrun_pct`, `underrun_pct`, `unplanned_actual`, `missing_actual`, `zero_budget_actual`
+        में से हो।
+
+
+        Network या external APIs न लें।
+
+
+        Technical terms to preserve exactly: `10`, `actual missing`, `budget is zero with actual spend`, `budget missing`,
+        `variance_pct < -10`, `variance_pct > 10`'
+      hinglish: 'Budget-vs-actuals variance report taiyar karo.
+
+
+        Inputs:
+
+        - `$WORKSPACE/in/budget.csv`
+
+        - `$WORKSPACE/in/actuals.csv`
+
+
+        Create:
+
+        - `$WORKSPACE/out/variance_report.csv`
+
+        - `$WORKSPACE/out/department_rollup.csv`
+
+        - `$WORKSPACE/out/review_reasons.json`
+
+        - `$WORKSPACE/out/summary.md`
+
+
+        `variance_report.csv` exact column order: `department,category,budget_amount,actual_amount,variance_amount,variance_pct,flag`.
+
+
+        Rules:
+
+        1. Input files modify mat karo.
+
+        2. department aur category par budget.csv aur actuals.csv ka full outer join karo. Matching actual na ho to actual_amount
+        0.00; matching budget na ho to budget_amount 0.00 ke saath unplanned item include karo.
+
+        3. variance_amount = actual_amount - budget_amount.
+
+        4. variance_pct = variance_amount / budget_amount * 100. budget_amount 0.00 aur actual nonzero ho to variance_pct
+        N/A, flag review; dono 0.00 hon to variance_pct 0.00, flag ok.
+
+        5. Amount fields exactly two decimals aur variance_pct exactly two decimals format karo.
+
+        6. Absolute variance_pct strictly 10.00 se bada ho to review, warna ok. Exactly 10.00 ok hai.
+
+        7. `summary.md` mein har review item aur largest overrun by variance_amount name karo.
+
+        8. Unplanned actuals, zero-budget rows aur missing actuals mention karo.
+
+
+        `department_rollup.csv` exact header: `department,budget_amount,actual_amount,variance_amount,variance_pct,review_item_count,rollup_flag`.
+        Full outer join logic ke baad `variance_report.csv` rows ko department se sum karo. Department variance_pct = department
+        variance_amount / department budget_amount * 100. Zero budget aur nonzero actual par N/A. review_item_count `flag=review`
+        category rows ka count ho; count > 0 par rollup_flag review, warna ok. Rows department ascending sort karo.
+
+
+        `review_reasons.json` valid JSON object ho aur har review item ko `"Department Category"` key se represent kare. Har
+        value mein reason_type aur primary_driver ho. reason_type sirf `overrun_pct`, `underrun_pct`, `unplanned_actual`,
+        `missing_actual`, `zero_budget_actual` ho.
+
+
+        Network ya external APIs use mat karo.
+
+
+        Technical terms to preserve exactly: `10`, `actual missing`, `budget is zero with actual spend`, `budget missing`,
+        `variance_pct < -10`, `variance_pct > 10`'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  001-file:
+    source_sha256: 24888547b022c40213f9bb8ab3f9dab662378141066ebb0ac8342b3bf632fe7e
+    instructions:
+      english: 'The working directory is `$WORKSPACE`.
+
+
+        Read `in/input.txt`, count the number of lines in the file, and write the result to `out/linecount.txt`.
+
+
+        Requirements:
+
+        - Write only a single integer (the line count).
+
+        - Do not modify `in/input.txt`.
+
+        '
+      hindi: '# फ़ाइल कार्य
+
+
+        कार्य-निर्देशिका `$WORKSPACE` है।
+
+
+        `in/input.txt` पढ़ें, फ़ाइल में लाइनों की संख्या गिनें और परिणाम `out/linecount.txt` में लिखें।
+
+
+        आवश्यकताएँ:
+
+        - केवल एक पूर्णांक लिखें (लाइन की संख्या)।
+
+        - `in/input.txt` में कोई बदलाव न करें।'
+      hinglish: '# File task
+
+
+        Working directory `$WORKSPACE` hai.
+
+
+        `in/input.txt` padho, file ki lines count karo aur result `out/linecount.txt` mein likho.
+
+
+        Requirements:
+
+        - Sirf ek integer likhna hai (line count).
+
+        - `in/input.txt` ko modify mat karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  020-archive-checksum:
+    source_sha256: b67defb0bb94644e61a9ffcfed176f933f10c7f2c381b5977eeecbd36bab8eea
+    instructions:
+      english: "You are working in the task workspace. Use only local files.\n\nInputs:\n- $WORKSPACE/in/bundle_a.zip\n- $WORKSPACE/in/bundle_b.tar\n\
+        - $WORKSPACE/in/checksums.json\n\nTask:\n1. Extract both archives without modifying the archive files.\n2. Compute\
+        \ size in bytes and sha256 for every regular file actually present in the archives.\n3. Compare those files against\
+        \ $WORKSPACE/in/checksums.json.\n4. Write $WORKSPACE/out/manifest.json and $WORKSPACE/out/mismatches.txt.\n\nRequired\
+        \ $WORKSPACE/out/manifest.json format:\n{\n  \"files\": [\n    {\"archive\": \"bundle_a.zip\", \"path\": \"data/metrics.csv\"\
+        , \"size\": 49, \"sha256\": \"...\"}\n  ]\n}\n\nRules:\n- The files array must contain every actual archived regular\
+        \ file exactly once.\n- Sort files by archive, then path.\n- path must be the path inside the archive, without leading\
+        \ ./.\n- Write $WORKSPACE/out/mismatches.txt as UTF-8 text, one row per mismatch, sorted exactly as:\n  archive,path,reason\n\
+        - Use reason \"checksum_mismatch\" for a present file whose sha256 differs from the checklist.\n- Use reason \"missing\"\
+        \ for a checklist entry not present in the extracted archive.\n- Do not list matching files in mismatches.txt.\n-\
+        \ Do not modify input files.\n"
+      hindi: "Task workspace में काम करें और केवल local files उपयोग करें।\n\nInputs:\n- `$WORKSPACE/in/bundle_a.zip`\n- `$WORKSPACE/in/bundle_b.tar`\n\
+        - `$WORKSPACE/in/checksums.json`\n\nकार्य:\n1. दोनों archives extract करें, archive files modify न करें।\n2. Archives\
+        \ में वास्तव में मौजूद हर regular file का size bytes में और sha256 निकालें।\n3. उन files को `$WORKSPACE/in/checksums.json`\
+        \ से compare करें।\n4. `$WORKSPACE/out/manifest.json` और `$WORKSPACE/out/mismatches.txt` लिखें।\n\nRequired `$WORKSPACE/out/manifest.json`\
+        \ format:\n{\n  \"files\": [\n    {\"archive\": \"bundle_a.zip\", \"path\": \"data/metrics.csv\", \"size\": 49, \"\
+        sha256\": \"...\"}\n  ]\n}\n\nRules:\n- files array में हर actual archived regular file ठीक एक बार हो।\n- Files को\
+        \ archive फिर path से sort करें।\n- path archive के अंदर का path हो, leading `./` के बिना।\n- `$WORKSPACE/out/mismatches.txt`\
+        \ UTF-8 text में लिखें; हर mismatch की row इस exact order में हो: `archive,path,reason`।\n- Checklist में मौजूद लेकिन\
+        \ extracted archive में न मिलने वाली entry के लिए reason `missing` और मौजूद file के अलग sha256 के लिए `checksum_mismatch`\
+        \ उपयोग करें।\n- Matching files mismatches.txt में न लिखें।\n- Input files modify न करें।"
+      hinglish: "Task workspace mein kaam karo aur sirf local files use karo.\n\nInputs:\n- `$WORKSPACE/in/bundle_a.zip`\n\
+        - `$WORKSPACE/in/bundle_b.tar`\n- `$WORKSPACE/in/checksums.json`\n\nTask:\n1. Dono archives extract karo, archive\
+        \ files ko modify mat karo.\n2. Archives mein actually present har regular file ka byte size aur sha256 compute karo.\n\
+        3. In files ko `$WORKSPACE/in/checksums.json` se compare karo.\n4. `$WORKSPACE/out/manifest.json` aur `$WORKSPACE/out/mismatches.txt`\
+        \ likho.\n\nRequired `$WORKSPACE/out/manifest.json` format:\n{\n  \"files\": [\n    {\"archive\": \"bundle_a.zip\"\
+        , \"path\": \"data/metrics.csv\", \"size\": 49, \"sha256\": \"...\"}\n  ]\n}\n\nRules:\n- files array mein har actual\
+        \ archived regular file exactly ek baar ho.\n- Files ko archive, phir path se sort karo.\n- path archive ke andar\
+        \ ka ho, leading `./` ke bina.\n- `$WORKSPACE/out/mismatches.txt` UTF-8 text mein likho; har mismatch row exact order\
+        \ `archive,path,reason` mein ho.\n- Checklist entry extracted archive mein na mile to reason `missing`; present file\
+        \ ka sha256 alag ho to `checksum_mismatch`.\n- Matching files ko mismatches.txt mein list mat karo.\n- Input files\
+        \ modify mat karo."
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  021-batch-rename-transform:
+    source_sha256: 2c270b683b3ccec98ceb8550397de81acb55f91395dd2d210343cdfd19ea2f6a
+    instructions:
+      english: "You are building a small offline file-standardization pipeline. Use only local files.\n\nInput directory:\n\
+        - $WORKSPACE/in/raw/\n\nCreate:\n- $WORKSPACE/out/normalized/\n- $WORKSPACE/out/rename_log.csv\n- $WORKSPACE/out/error_report.csv\n\
+        \nSupported transformations:\n1. TXT \"Key: Value\" revenue files\n   - Convert valid region/amount/currency records\
+        \ into JSON.\n   - Output filename format: revenue_<yyyy>_<mm>.json.\n2. Customer CSV exports\n   - Convert valid\
+        \ rows to a JSON array.\n   - Normalize keys to name,email,spend.\n   - Spend must be numeric.\n   - Skip bad rows\
+        \ and report them in error_report.csv.\n3. Inventory JSON files\n   - Convert the items array to CSV with columns\
+        \ sku,qty sorted by sku.\n   - Output filename format: inventory_<warehouse>.csv.\n\nFilename rules:\n- Recursively\
+        \ scan $WORKSPACE/in/raw/.\n- Supported extensions are .txt, .csv, and .json, case-insensitive.\n- Do not process\
+        \ unsupported files.\n- Normalize output filenames to lowercase snake_case.\n- If two supported inputs would produce\
+        \ the same output name, keep the first sorted source path as the base name and append __2, __3, etc. to later conflicting\
+        \ output names.\n\nCSV log requirements:\n- rename_log.csv exact header: source,target,action\n- Include one row for\
+        \ every successfully transformed supported input.\n- Sort rows by source path.\n- Use workspace-relative paths such\
+        \ as in/raw/...\n\nerror_report.csv requirements:\n- Exact header: source,row_or_record,error_type,details\n- Include\
+        \ malformed supported records and unsupported files.\n- Unsupported files must be reported but not copied into out/normalized.\n\
+        \nRules:\n- Do not modify or delete input files.\n- Do not create extra files in $WORKSPACE/out/normalized/.\n- JSON\
+        \ outputs must be valid UTF-8 JSON.\n"
+      hindi: 'केवल local files का उपयोग करके एक छोटा offline file-standardization pipeline बनाएं।
+
+
+        Input directory: `$WORKSPACE/in/raw/`
+
+
+        बनाएँ:
+
+        - `$WORKSPACE/out/normalized/`
+
+        - `$WORKSPACE/out/rename_log.csv`
+
+        - `$WORKSPACE/out/error_report.csv`
+
+
+        Supported transformations:
+
+        1. TXT `Key: Value` revenue files: valid region/amount/currency records को JSON में बदलें; output filename `revenue_<yyyy>_<mm>.json`
+        हो।
+
+        2. Customer CSV exports: valid rows को JSON array में बदलें; keys name,email,spend normalize करें; spend numeric होना
+        चाहिए; bad rows skip करके `error_report.csv` में report करें।
+
+        3. Inventory JSON files: items array को `sku,qty` columns वाली CSV में बदलें, sku से sorted। Output filename `inventory_<warehouse>.csv`
+        हो।
+
+
+        Filename rules:
+
+        - `$WORKSPACE/in/raw/` को recursively scan करें।
+
+        - Supported extensions `.txt`, `.csv`, `.json` case-insensitive हैं।
+
+        - Unsupported files process न करें।
+
+        - Output filenames को lowercase snake_case normalize करें।
+
+        - दो supported inputs का output name same हो तो sorted source path वाली पहली file को base name दें और बाद की conflicting
+        names में `__2`, `__3` आदि जोड़ें।
+
+
+        CSV log requirements:
+
+        - `rename_log.csv` exact header: `source,target,action`
+
+        - हर successfully transformed supported input की एक row हो।
+
+        - Rows source path से sorted हों और workspace-relative paths जैसे `in/raw/...` उपयोग करें।
+
+
+        `error_report.csv` exact header: `source,row_or_record,error_type,details`। Malformed supported records और unsupported
+        files include करें। Unsupported files report हों, लेकिन `out/normalized` में copy न हों।
+
+
+        Input files modify/delete न करें, `out/normalized` में extra files न बनाएं और JSON outputs valid UTF-8 JSON हों।'
+      hinglish: 'Sirf local files use karke ek chhota offline file-standardization pipeline banao.
+
+
+        Input directory: `$WORKSPACE/in/raw/`
+
+
+        Create:
+
+        - `$WORKSPACE/out/normalized/`
+
+        - `$WORKSPACE/out/rename_log.csv`
+
+        - `$WORKSPACE/out/error_report.csv`
+
+
+        Supported transformations:
+
+        1. TXT `Key: Value` revenue files ko valid region/amount/currency records se JSON mein convert karo; filename `revenue_<yyyy>_<mm>.json`.
+
+        2. Customer CSV exports ki valid rows ko JSON array mein convert karo; keys name,email,spend normalize karo; spend
+        numeric ho; bad rows skip karke `error_report.csv` mein report karo.
+
+        3. Inventory JSON files ki items array ko `sku,qty` columns wali CSV mein convert karo, sku sorted; filename `inventory_<warehouse>.csv`.
+
+
+        Filename rules:
+
+        - `$WORKSPACE/in/raw/` ko recursively scan karo.
+
+        - Supported extensions `.txt`, `.csv`, `.json` case-insensitive hain.
+
+        - Unsupported files process mat karo.
+
+        - Output filenames lowercase snake_case mein normalize karo.
+
+        - Agar do supported inputs ka output name same ho, sorted source path wali first file ko base name rakho; baad wali
+        conflicts mein `__2`, `__3` add karo.
+
+
+        CSV log requirements:
+
+        - `rename_log.csv` exact header: `source,target,action`.
+
+        - Har successfully transformed supported input ki row ho.
+
+        - Rows source path se sort hon; workspace-relative paths jaise `in/raw/...` use karo.
+
+
+        `error_report.csv` exact header: `source,row_or_record,error_type,details`. Malformed supported records aur unsupported
+        files include karo. Unsupported files report hon, lekin `out/normalized` mein copy na hon.
+
+
+        Input files modify/delete mat karo, `out/normalized` mein extra files mat banao, aur JSON outputs valid UTF-8 JSON
+        hon.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  079-smallfile-batch-reject-ledger:
+    source_sha256: e026278997d8e8bcf76f87a3a8f078d61b5756039a5051a5af157c5dd4c15a47
+    instructions:
+      english: 'Build an offline batch normalization pipeline using only local files.
+
+
+        Input:
+
+        - $WORKSPACE/in/dropbox/
+
+        - $WORKSPACE/in/normalization_rules.yaml
+
+
+        Recursively scan all files. Convert supported valid records into one normalized JSON file per input under
+
+        $WORKSPACE/out/normalized/. Write deterministic ledgers.
+
+
+        Supported formats:
+
+        - customer CSV files with columns id,name,email,status
+
+        - order JSON files with order_id, customer_id, amount, currency
+
+        - note TXT files containing lines like Case: C-100, Owner: ana, Status: open
+
+
+        Create:
+
+        - $WORKSPACE/out/normalized/
+
+        - $WORKSPACE/out/index.csv
+
+        - $WORKSPACE/out/reject_ledger.csv
+
+        - $WORKSPACE/out/batch_summary.json
+
+
+        index.csv header: source_path,target_path,record_type,record_id,status
+
+        reject_ledger.csv header: source_path,error_type,details
+
+
+        Rules:
+
+        - Use workspace-relative source paths such as in/dropbox/customers_01.csv.
+
+        - Sort index rows and reject rows by source_path.
+
+        - If one input file contains multiple valid records, create one normalized JSON file per valid record.
+
+        - Treat record ids as globally unique across all supported files; later duplicate ids must be rejected.
+
+        - Do not modify or delete input files.
+
+        - Unknown extensions, malformed files, missing required fields, invalid status, invalid amount, and duplicate record
+        ids must be recorded in reject_ledger.csv.
+
+        '
+      hindi: 'केवल local files से offline batch normalization pipeline बनाएं।
+
+
+        Input:
+
+        - `$WORKSPACE/in/dropbox/`
+
+        - `$WORKSPACE/in/normalization_rules.yaml`
+
+
+        सभी files recursively scan करें। Supported valid records को `$WORKSPACE/out/normalized/` में हर input के लिए एक normalized
+        JSON file में बदलें और deterministic ledgers लिखें।
+
+
+        Supported formats:
+
+        - customer CSV files जिनमें columns id,name,email,status हों।
+
+        - order JSON files जिनमें order_id, customer_id, amount, currency हों।
+
+        - note TXT files जिनमें `Case: C-100, Owner: ana, Status: open` जैसी lines हों।
+
+
+        बनाएँ:
+
+        - `$WORKSPACE/out/normalized/`
+
+        - `$WORKSPACE/out/index.csv`
+
+        - `$WORKSPACE/out/reject_ledger.csv`
+
+        - `$WORKSPACE/out/batch_summary.json`
+
+
+        `index.csv` header: `source_path,target_path,record_type,record_id,status`
+
+        `reject_ledger.csv` header: `source_path,error_type,details`
+
+
+        Rules:
+
+        - Workspace-relative source paths जैसे `in/dropbox/customers_01.csv` उपयोग करें।
+
+        - index rows और reject rows को source_path से sort करें।
+
+        - एक input file में कई valid records हों तो हर valid record की अलग normalized JSON file बनाएं।
+
+        - Record ids सभी supported files में globally unique मानें; बाद में मिले duplicate ids reject करें।
+
+        - Input files modify/delete न करें। Unknown extensions, malformed files, missing required fields, invalid status,
+        invalid amount और duplicate record ids को reject_ledger.csv में record करें।'
+      hinglish: 'Sirf local files se offline batch normalization pipeline banao.
+
+
+        Input:
+
+        - `$WORKSPACE/in/dropbox/`
+
+        - `$WORKSPACE/in/normalization_rules.yaml`
+
+
+        Sabhi files ko recursively scan karo. Supported valid records ko har input ke liye `$WORKSPACE/out/normalized/` mein
+        ek normalized JSON file mein convert karo aur deterministic ledgers likho.
+
+
+        Supported formats:
+
+        - customer CSV files with columns id,name,email,status.
+
+        - order JSON files with order_id, customer_id, amount, currency.
+
+        - note TXT files jinmein `Case: C-100, Owner: ana, Status: open` jaise lines hon.
+
+
+        Create:
+
+        - `$WORKSPACE/out/normalized/`
+
+        - `$WORKSPACE/out/index.csv`
+
+        - `$WORKSPACE/out/reject_ledger.csv`
+
+        - `$WORKSPACE/out/batch_summary.json`
+
+
+        `index.csv` header: `source_path,target_path,record_type,record_id,status`
+
+        `reject_ledger.csv` header: `source_path,error_type,details`
+
+
+        Rules:
+
+        - Workspace-relative source paths jaise `in/dropbox/customers_01.csv` use karo.
+
+        - index aur reject rows ko source_path se sort karo.
+
+        - Ek input mein multiple valid records hon to har valid record ki separate normalized JSON file banao.
+
+        - Record ids sab supported files mein globally unique hain; baad mein aane wale duplicate ids reject karo.
+
+        - Input files modify/delete mat karo. Unknown extensions, malformed files, missing required fields, invalid status,
+        invalid amount aur duplicate record ids ko reject_ledger.csv mein record karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  004-meeting-summary:
+    source_sha256: 50cd93b03eb1f2f173af6f2ff6825a25e0bc4046a697571a4962c22671dc7715
+    instructions:
+      english: 'Read **`$WORKSPACE/in/meeting_transcript.txt`** (full transcript of a product meeting) and write an **English
+        meeting summary** to **`$WORKSPACE/out/meeting_summary.txt`** (UTF-8 text; create `mkdir -p out` first if needed).
+
+
+        **Content and format:**
+
+        1. Use **one to three paragraphs** in English to cover: **main topics**, **aligned conclusions or decisions**, **major
+        risks or open issues**, and **clear follow-ups** (no need to recap sentence-by-sentence, but a reader should follow
+        the discussion without reading the full transcript). **Only include what the transcript supports**—do not speculate
+        or invent.
+
+        2. **Length**: aim for a typical **short workplace summary**—clearly **more than a few slogan-like bullets**, and
+        clearly **shorter than copying the transcript**; most readers should finish in **about one to two minutes**. Avoid
+        ultra-short bullet dumps or very long essays.
+
+        3. **Information density**: naturally include several **recurring or anchoring terms** from the transcript (org/product-line
+        names, phase or release wording, resource or constraint language, named technical or process objects, etc.) while
+        keeping the summary coherent; avoid stuffing unrelated terms just to look “complete”.
+
+
+        **Output path:** `out/meeting_summary.txt` only.
+
+        '
+      hindi: '**`$WORKSPACE/in/meeting_transcript.txt`** पढ़ें (यह product meeting का पूरा transcript है) और **English meeting
+        summary** को **`$WORKSPACE/out/meeting_summary.txt`** में लिखें (UTF-8 text; जरूरत हो तो पहले `mkdir -p out` करें)।
+
+
+        **Content और format:**
+
+        1. English में **एक से तीन paragraphs** में **main topics**, **aligned conclusions या decisions**, **major risks या
+        open issues** और **clear follow-ups** cover करें। केवल transcript द्वारा समर्थित बातें लिखें—अनुमान या invention न
+        करें।
+
+        2. **Length**: short workplace summary जैसा हो—कुछ slogan-जैसे bullets से स्पष्ट रूप से लंबा और transcript copy करने
+        से छोटा; अधिकतर readers इसे **about one to two minutes** में पढ़ सकें। Ultra-short bullet dump या बहुत लंबा essay
+        न हो।
+
+        3. **Information density**: transcript के कई recurring/anchoring terms (org/product-line names, phase/release wording,
+        resource/constraint language, named technical/process objects आदि) स्वाभाविक रूप से शामिल करें, लेकिन summary coherent
+        रहे।
+
+
+        **Output path:** केवल `out/meeting_summary.txt`।'
+      hinglish: '**`$WORKSPACE/in/meeting_transcript.txt`** padho (yeh product meeting ka full transcript hai) aur **English
+        meeting summary** **`$WORKSPACE/out/meeting_summary.txt`** mein likho (UTF-8 text; zarurat ho to pehle `mkdir -p out`
+        karo).
+
+
+        **Content aur format:**
+
+        1. English mein **one to three paragraphs** mein **main topics**, **aligned conclusions/decisions**, **major risks/open
+        issues** aur **clear follow-ups** cover karo. Sirf transcript-supported facts likho—speculate ya invent mat karo.
+
+        2. **Length** short workplace summary jaisi ho: slogan-like kuch bullets se clearly lambi, transcript copy se clearly
+        chhoti; reader ise **about one to two minutes** mein padh sake. Ultra-short bullet dump ya bahut lamba essay mat likho.
+
+        3. **Information density** ke liye transcript ke kai recurring/anchoring terms (org/product-line names, phase/release
+        wording, resource/constraint language, named technical/process objects) naturally include karo, par summary coherent
+        rakho.
+
+
+        **Output path:** Sirf `out/meeting_summary.txt`.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  005-email-triage:
+    source_sha256: 6ef2529329eacc89b69c5cb7b75708c59ed2ae81e9fa217cc1fece4e72ca8182
+    instructions:
+      english: "You are in a mock inbox environment. Process the email list in **`$WORKSPACE/in/emails.json`**. The file is\
+        \ a JSON object whose **`emails`** field is an array; each email has `id`, `from`, `subject`, and `body`. Working\
+        \ directory: `$WORKSPACE`.\n\nComplete the following:\n\n1) **Read** every email in `$WORKSPACE/in/emails.json` and\
+        \ assign one of three labels:\n   - `spam`: junk/scams/obvious ignore; should go on the deletion list.\n   - `needs_reply`:\
+        \ threads that need a human-like reply (e.g. a colleague asking if you are free).\n   - `ok`: no reply needed (system\
+        \ notifications, FYI-only, etc.).\n\n2) Write classifications to **`$WORKSPACE/out/triage.json`** (JSON object; keys\
+        \ are email `id` strings; values look like):\n   `{\"label\":\"spam|needs_reply|ok\",\"reason_short\":\"one-line reason\"\
+        }`\n\n3) Write every `spam` email `id`, one per line, to **`$WORKSPACE/out/delete_ids.txt`** (ids only; no other text).\
+        \ Do not list non-spam ids.\n\n4) For each `needs_reply` email, write the **reply body** (plain text) to **`$WORKSPACE/out/replies/<id>.txt`**\
+        \ (e.g. `out/replies/002.txt`). Replies must **directly answer the question** (e.g. if they ask “Are you free today?”,\
+        \ say whether you are free or propose a time). Do not reply off-topic.\n\n5) First run `mkdir -p $WORKSPACE/out $WORKSPACE/out/replies`.\n"
+      hindi: 'आप mock inbox environment में हैं। `$WORKSPACE/in/emails.json` की email list process करें। File एक JSON object
+        है जिसके `emails` field में array है; हर email में `id`, `from`, `subject`, `body` हैं। Working directory: `$WORKSPACE`।
+
+
+        1) `$WORKSPACE/in/emails.json` की हर email पढ़ें और तीन labels में से एक दें:
+
+        - `spam`: junk/scam/obvious ignore; deletion list में जाएगी।
+
+        - `needs_reply`: human-like reply चाहिए।
+
+        - `ok`: reply जरूरी नहीं (system notification, FYI आदि)।
+
+
+        2) Classifications `$WORKSPACE/out/triage.json` में लिखें: JSON object; keys email `id` strings और values `{"label":"spam|needs_reply|ok","reason_short":"one-line
+        reason"}` जैसे हों।
+
+
+        3) हर `spam` email id को एक line में `$WORKSPACE/out/delete_ids.txt` में लिखें (केवल ids; कोई और text नहीं)। Non-spam
+        ids न लिखें।
+
+
+        4) हर `needs_reply` email के लिए reply body (plain text) `$WORKSPACE/out/replies/<id>.txt` में लिखें (जैसे `out/replies/002.txt`)।
+        Reply सीधे प्रश्न का उत्तर दे; off-topic reply न दें।
+
+
+        5) सबसे पहले `mkdir -p $WORKSPACE/out $WORKSPACE/out/replies` चलाएँ।
+
+
+        Technical terms to preserve exactly: `/scams/obvious`'
+      hinglish: 'Aap mock inbox environment mein ho. `$WORKSPACE/in/emails.json` ki email list process karo. File JSON object
+        hai jiske `emails` field mein array hai; har email mein `id`, `from`, `subject`, `body` hain. Working directory `$WORKSPACE`
+        hai.
+
+
+        1) `$WORKSPACE/in/emails.json` ki har email padho aur ek label do:
+
+        - `spam`: junk/scam/obvious ignore; deletion list mein jayegi.
+
+        - `needs_reply`: human-like reply ki zarurat.
+
+        - `ok`: reply ki zarurat nahi, jaise system notification ya FYI.
+
+
+        2) Classifications `$WORKSPACE/out/triage.json` mein likho: JSON object; email `id` strings keys hon aur values `{"label":"spam|needs_reply|ok","reason_short":"one-line
+        reason"}` jaisi hon.
+
+
+        3) Har `spam` email id ko ek line mein `$WORKSPACE/out/delete_ids.txt` mein likho (sirf ids; aur kuch nahi). Non-spam
+        ids list mat karo.
+
+
+        4) Har `needs_reply` email ke liye plain-text reply body `$WORKSPACE/out/replies/<id>.txt` mein likho, jaise `out/replies/002.txt`.
+        Reply question ka direct answer de; off-topic reply mat do.
+
+
+        5) Sabse pehle `mkdir -p $WORKSPACE/out $WORKSPACE/out/replies` run karo.
+
+
+        Technical terms to preserve exactly: `/scams/obvious`'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  025-meeting-action-tracker:
+    source_sha256: 70309b7103e46fc8cac07554e438860ac6d787b9c4b03be36fbfb31a101d9ad9
+    instructions:
+      english: 'You are the project coordinator for the Atlas launch.
+
+
+        Inputs:
+
+        - $WORKSPACE/in/transcript.txt
+
+        - $WORKSPACE/in/transcript_part2.txt
+
+        - $WORKSPACE/in/transcript_part3.txt
+
+        - $WORKSPACE/in/followup_emails.md
+
+        - $WORKSPACE/in/previous_actions.csv
+
+        - $WORKSPACE/in/project_dependencies.json
+
+
+        Write exactly these outputs:
+
+        - $WORKSPACE/out/action_items.csv
+
+        - $WORKSPACE/out/owner_followups.md
+
+        - $WORKSPACE/out/merge_rationale.md
+
+
+        action_items.csv requirements:
+
+        - CSV header: action_id,owner,task,deadline,status,source
+
+        - Include new actions from transcripts/emails and carry forward previous incomplete actions that remain open.
+
+        - Merge updates into an existing incomplete action when it is the same work item.
+
+        - Preserve existing action_id values for carried-forward or updated previous actions. Use NEW-<short-id> for genuinely
+        new actions.
+
+        - Apply explicit cancellation, completion, reassignment, and deadline changes from later sources. Source recency is:
+        previous_actions.csv < transcript.txt < transcript_part2.txt < followup_emails.md < transcript_part3.txt.
+
+        - Do not include previous completed actions as open work.
+
+        - Use ISO dates YYYY-MM-DD.
+
+        - Do not include cancelled or newly completed actions in action_items.csv.
+
+        - For new actions introduced in the transcripts, use these IDs: compliance signoff checklist → NEW-01, security audit
+        brief → NEW-02, customer quotes for launch brief → NEW-03.
+
+
+        owner_followups.md requirements:
+
+        - Group follow-ups by owner.
+
+        - Mention each owner with open work and their deadlines.
+
+        - For any action with status "pending" due to a dependency, explicitly note what it is blocked by.
+
+
+        merge_rationale.md requirements:
+
+        - Explain which previous actions were carried forward, updated, cancelled, reassigned, or completed.
+
+        - Cite the source file for each decision.
+
+        - Explain dependency-driven deadline changes and bulk reassignments/cancellations explicitly.
+
+        - Do not modify input files.
+
+
+        Additional requirements:
+
+        - Read $WORKSPACE/in/project_dependencies.json and apply dependency rules.
+
+        - If an action is blocked_by another open action, apply the specified rule (extend deadline or set status to pending).
+
+        - Handle bulk updates (e.g., owner rolling off) by cancelling affected open actions. Reassign only if another owner
+        has explicitly taken over the same work item in a later source.
+
+        - When resource conflicts exist for an owner with multiple deadlines, apply the resolution rule only if all affected
+        actions remain open and their deadlines fall within the conflicting window. If any affected action is completed or
+        cancelled, the conflict does not apply.
+
+        - The source field should record the file that made the last substantive change to the action. If the change was driven
+        by a dependency rule or bulk update, you may use "project_dependencies.json" as the source.'
+      hindi: 'आप Atlas launch के project coordinator हैं।
+
+
+        Inputs:
+
+        - `$WORKSPACE/in/transcript.txt`
+
+        - `$WORKSPACE/in/transcript_part2.txt`
+
+        - `$WORKSPACE/in/transcript_part3.txt`
+
+        - `$WORKSPACE/in/followup_emails.md`
+
+        - `$WORKSPACE/in/previous_actions.csv`
+
+        - `$WORKSPACE/in/project_dependencies.json`
+
+
+        ठीक ये outputs लिखें:
+
+        - `$WORKSPACE/out/action_items.csv`
+
+        - `$WORKSPACE/out/owner_followups.md`
+
+        - `$WORKSPACE/out/merge_rationale.md`
+
+
+        `action_items.csv` requirements:
+
+        - Header `action_id,owner,task,deadline,status,source` रखें।
+
+        - Transcripts/emails से new actions जोड़ें और खुले रहने वाले previous incomplete actions carry forward करें।
+
+        - Same work item होने पर updates को existing incomplete action में merge करें।
+
+        - Carried-forward/updated previous actions के existing action_id रखें। सचमुच नए actions के लिए `NEW-<short-id>` उपयोग
+        करें।
+
+        - Later sources के explicit cancellation, completion, reassignment और deadline changes लागू करें। Source recency:
+        previous_actions.csv < transcript.txt < transcript_part2.txt < followup_emails.md < transcript_part3.txt।
+
+        - Previous completed actions को open work में न रखें। Dates ISO `YYYY-MM-DD` हों। Cancelled या newly completed actions
+        action_items.csv में न हों।
+
+        - Transcript में आए new actions को IDs दें: compliance signoff checklist → `NEW-01`, security audit brief → `NEW-02`,
+        customer quotes for launch brief → `NEW-03`।
+
+
+        `owner_followups.md` में follow-ups को owner से group करें, open work और deadlines mention करें। Status `pending`
+        dependency के कारण हो तो किस चीज़ से blocked है स्पष्ट लिखें।
+
+
+        `merge_rationale.md` में previous actions कौन carry forward, update, cancel, reassign या complete हुए और हर decision
+        का source file समझाएँ। Dependency-driven deadline changes और bulk reassignments/cancellations स्पष्ट करें। Input files
+        modify न करें।
+
+
+        Additional requirements:
+
+        - `$WORKSPACE/in/project_dependencies.json` पढ़कर dependency rules लागू करें।
+
+        - Action किसी open action से blocked हो तो specified rule लागू करें (deadline extend या status pending)।
+
+        - Bulk updates (जैसे owner का roll off) में प्रभावित open actions cancel करें। Reassign तभी करें जब later source में
+        किसी अन्य owner ने same work item explicitly take over किया हो।
+
+        - Owner के resource conflicts हों तो resolution rule तभी लागू करें जब सभी affected actions open हों और deadlines conflicting
+        window में हों। कोई action completed/cancelled हो तो conflict लागू नहीं।
+
+        - source में last substantive change वाली file रखें; dependency/bulk update से change हो तो `project_dependencies.json`
+        source हो सकता है।'
+      hinglish: "Aap Atlas launch ke project coordinator ho.\n\nInputs:\n- `$WORKSPACE/in/transcript.txt`\n- `$WORKSPACE/in/transcript_part2.txt`\n\
+        - `$WORKSPACE/in/transcript_part3.txt`\n- `$WORKSPACE/in/followup_emails.md`\n- `$WORKSPACE/in/previous_actions.csv`\n\
+        - `$WORKSPACE/in/project_dependencies.json`\n\nExactly ye outputs likho:\n- `$WORKSPACE/out/action_items.csv`\n- `$WORKSPACE/out/owner_followups.md`\n\
+        - `$WORKSPACE/out/merge_rationale.md`\n\n`action_items.csv` requirements:\n- Header `action_id,owner,task,deadline,status,source`\
+        \ rakho.\n- Transcripts/emails se new actions add karo aur open rehne wale previous incomplete actions carry forward\
+        \ karo.\n- Same work item ho to update ko existing incomplete action mein merge karo.\n- Carried-forward/updated actions\
+        \ ka existing action_id preserve karo; genuinely new actions ke liye `NEW-<short-id>` use karo.\n- Later sources ke\
+        \ explicit cancellation, completion, reassignment aur deadline changes apply karo. Source recency: previous_actions.csv\
+        \ < transcript.txt < transcript_part2.txt < followup_emails.md < transcript_part3.txt.\n- Previous completed actions\
+        \ ko open work mein include mat karo. Dates ISO `YYYY-MM-DD` hon. Cancelled ya newly completed actions action_items.csv\
+        \ mein nahi hon.\n- Transcript ke new actions ko IDs do: compliance signoff checklist → `NEW-01`, security audit brief\
+        \ → `NEW-02`, customer quotes for launch brief → `NEW-03`.\n\n`owner_followups.md` mein follow-ups ko owner ke hisaab\
+        \ se group karo; har owner ka open work aur deadlines mention karo. Dependency ke karan status `pending` ho to blocker\
+        \ explicitly likho.\n\n`merge_rationale.md` mein explain karo kaunse previous actions carry forward, update, cancel,\
+        \ reassign ya complete hue; har decision ka source file cite karo. Dependency-driven deadline changes aur bulk reassignments/cancellations\
+        \ clearly explain karo. Input files modify mat karo.\n\nAdditional requirements:\n- `$WORKSPACE/in/project_dependencies.json`\
+        \ padho aur dependency rules apply karo.\n- Action kisi open action se blocked ho to specified rule apply karo (deadline\
+        \ extend ya status pending).\n- Bulk updates (jaise owner roll off) mein affected open actions cancel karo. Reassign\
+        \ sirf tab karo jab later source mein another owner ne same work item explicitly take over kiya ho.\n- Owner resource\
+        \ conflict mein resolution rule tabhi apply karo jab sab affected actions open hon aur deadlines conflicting window\
+        \ mein hon. Koi affected action completed/cancelled ho to conflict apply nahi.\n        - source field mein last substantive\
+        \ change ki file rakho; dependency ya bulk update driven change ho to `project_dependencies.json` source ho sakta\
+        \ hai."
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  028-email-thread-merge:
+    source_sha256: 61073f234a947d648dda57507687c0b7b10bd2a36e0142c4fe99df540cc20e7a
+    instructions:
+      english: 'Merge the email messages into coherent threads and draft the next reply.
+
+
+        Inputs:
+
+        - $WORKSPACE/in/emails/*.json
+
+
+        Outputs:
+
+        - $WORKSPACE/out/thread_summary.json
+
+        - $WORKSPACE/out/reply_draft.txt
+
+
+        thread_summary.json requirements:
+
+        - JSON object with a "threads" array.
+
+        - Deduplicate forwarded or repeated messages that contain the same message_id or same substantive body.
+
+        - Keep unrelated subjects in separate threads.
+
+        - For the Northwind onboarding thread, include a chronological timeline and final_todos.
+
+        - Preserve ISO timestamps exactly as provided.
+
+
+        reply_draft.txt requirements:
+
+        - Draft a reply for the Northwind onboarding thread only.
+
+        - Address Morgan Lee.
+
+        - Confirm the agreed pilot kickoff date, name the missing security questionnaire, and avoid claiming that procurement
+        approval is complete.
+
+        - Do not modify input files.
+
+        '
+      hindi: 'Email messages को coherent threads में merge करें और अगला reply draft करें।
+
+
+        Inputs: `$WORKSPACE/in/emails/*.json`
+
+
+        Outputs:
+
+        - `$WORKSPACE/out/thread_summary.json`
+
+        - `$WORKSPACE/out/reply_draft.txt`
+
+
+        `thread_summary.json` requirements:
+
+        - `threads` array वाला JSON object हो।
+
+        - Forwarded या repeated messages deduplicate करें जब same message_id या same substantive body हो।
+
+        - Unrelated subjects को अलग threads में रखें।
+
+        - Northwind onboarding thread के लिए chronological timeline और `final_todos` शामिल करें।
+
+        - ISO timestamps जैसे दिए गए हैं वैसे exact preserve करें।
+
+
+        `reply_draft.txt` केवल Northwind onboarding thread के लिए reply हो। Morgan Lee को address करें, agreed pilot kickoff
+        date confirm करें, missing security questionnaire का नाम दें और procurement approval complete होने का दावा न करें।
+        Input files modify न करें।'
+      hinglish: 'Email messages ko coherent threads mein merge karo aur next reply draft karo.
+
+
+        Inputs: `$WORKSPACE/in/emails/*.json`
+
+
+        Outputs:
+
+        - `$WORKSPACE/out/thread_summary.json`
+
+        - `$WORKSPACE/out/reply_draft.txt`
+
+
+        `thread_summary.json` requirements:
+
+        - `threads` array wala JSON object ho.
+
+        - Forwarded/repeated messages ko deduplicate karo jab same message_id ya same substantive body ho.
+
+        - Unrelated subjects ko separate threads mein rakho.
+
+        - Northwind onboarding thread mein chronological timeline aur `final_todos` include karo.
+
+        - ISO timestamps ko exactly preserve karo.
+
+
+        `reply_draft.txt` sirf Northwind onboarding thread ka reply ho. Morgan Lee ko address karo, agreed pilot kickoff date
+        confirm karo, missing security questionnaire name karo, aur procurement approval complete hone ka claim mat karo.
+        Input files modify mat karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  012-doc-synthesis:
+    source_sha256: ea4fc4f5c425c930a6bb1e808faeb52416daef092c88e55f1a0daaa2e103ed19
+    instructions:
+      english: "Task: multi-document synthesis and contradiction detection\n\nYou have five documents about the same incident\
+        \ under `$WORKSPACE/in/`:\n- doc1_news_site_a.md (NewsSite A article)\n- doc2_news_site_b.md (NewsSite B article)\n\
+        - doc3_social_media.md (social posts / rumors)\n- doc4_official_statement.md (official statement)\n- doc5_expert_analysis.md\
+        \ (expert analysis)\n\nThey conflict and may contain errors or bias.\n\nComplete the following; write everything under\
+        \ `$WORKSPACE/out/`:\n\n1. Per-document trust scores (**trustworthiness.json**)\n   Score each document 0–10 with\
+        \ a short rationale (e.g. source authority, internal consistency, evidence chain).\n   Shape:\n   {\n     \"doc1_news_site_a.md\"\
+        : {\"score\": 6, \"reason\": \"specific numbers but sensational tone\"},\n     ...\n   }\n\n2. Contradictions (**contradictions.json**)\n\
+        \   List key contradictions (at least 3), citing which documents are involved and representative quotes/snippets.\n\
+        \   Shape:\n   {\n     \"contradictions\": [\n       {\n         \"claim\": \"example axis of disagreement\",\n  \
+        \       \"documents\": [\"doc1\", \"doc2\", \"doc4\"],\n         \"quotes\": [\"...\", \"...\", \"...\"],\n      \
+        \   \"resolution\": \"your best-supported resolution\"\n       }\n     ]\n   }\n\n3. Final narrative (**final_report.md**)\n\
+        \   - Most credible account based on cross-checking (about 1200–3500 characters of prose in English).\n   - An **Uncertainty\
+        \ / disputes** section.\n   - Evidence pointers using `[filename]` tags.\n\nScoring emphasizes reasonable trust scores,\
+        \ thorough contradiction coverage, and a logical, evidence-backed final report.\n"
+      hindi: 'कार्य: multi-document synthesis और contradiction detection
+
+
+        एक ही incident से जुड़े पाँच documents `$WORKSPACE/in/` में हैं:
+
+        - `doc1_news_site_a.md` (NewsSite A article)
+
+        - `doc2_news_site_b.md` (NewsSite B article)
+
+        - `doc3_social_media.md` (social posts / rumors)
+
+        - `doc4_official_statement.md` (official statement)
+
+        - `doc5_expert_analysis.md` (expert analysis)
+
+
+        इनमें conflicts और errors/bias हो सकते हैं। सब कुछ `$WORKSPACE/out/` में लिखें:
+
+
+        1. Per-document trust scores (`trustworthiness.json`): हर document को 0–10 score और छोटा rationale दें (source authority,
+        internal consistency, evidence chain आदि)। Shape में हर filename key हो और `{score, reason}` object हो।
+
+        2. Contradictions (`contradictions.json`): कम-से-कम 3 key contradictions list करें; involved documents और representative
+        quotes/snippets दें। हर item में `claim`, `documents`, `quotes`, `resolution` fields हों।
+
+        3. Final narrative (`final_report.md`): cross-checking पर आधारित सबसे credible account English में लगभग 1200–3500
+        characters prose में लिखें; **Uncertainty / disputes** section रखें; evidence pointers `[filename]` tags में दें।
+
+
+        Scoring reasonable trust scores, thorough contradiction coverage और logical evidence-backed report पर है।
+
+
+        Technical terms to preserve exactly: `6`'
+      hinglish: 'Task: multi-document synthesis aur contradiction detection
+
+
+        Ek incident ke baare mein paanch documents `$WORKSPACE/in/` mein hain:
+
+        - `doc1_news_site_a.md` (NewsSite A article)
+
+        - `doc2_news_site_b.md` (NewsSite B article)
+
+        - `doc3_social_media.md` (social posts / rumors)
+
+        - `doc4_official_statement.md` (official statement)
+
+        - `doc5_expert_analysis.md` (expert analysis)
+
+
+        Facts conflict kar sakte hain aur errors/bias ho sakta hai. Sab outputs `$WORKSPACE/out/` mein likho:
+
+
+        1. Per-document trust scores (`trustworthiness.json`): har document ko 0–10 score aur short rationale do (source authority,
+        internal consistency, evidence chain). Har filename key ho aur `{score, reason}` object ho.
+
+        2. Contradictions (`contradictions.json`): kam-se-kam 3 key contradictions list karo, involved documents aur representative
+        quotes/snippets ke saath. Har item mein `claim`, `documents`, `quotes`, `resolution` fields hon.
+
+        3. Final narrative (`final_report.md`): cross-checking par based most credible account English mein approx 1200–3500
+        characters prose mein likho; **Uncertainty / disputes** section add karo; evidence pointers `[filename]` tags use
+        karo.
+
+
+        Scoring reasonable trust scores, thorough contradiction coverage aur logical evidence-backed report par depend karega.
+
+
+        Technical terms to preserve exactly: `6`'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  033-offline-knowledge-qa:
+    source_sha256: e386751f1ef294896e13fd51a080d7f3558b758617dc9880d5bdcc0cedffe2c4
+    instructions:
+      english: 'Task: Offline Document QA with Evidence Attribution
+
+
+        You may only use the offline materials in `$WORKSPACE/in/docs/*.md` and `$WORKSPACE/in/questions.json`. Do not go
+        online, and do not use common knowledge to fill in information not present in the materials.
+
+
+        Read all questions from `questions.json` and write the answers to `$WORKSPACE/out/answers.json`.
+
+
+        Output format:
+
+        - The top level must be a JSON array, each element corresponding to one question.
+
+        - Each element must include: `question_id`, `answer`, `source_file`, `quote_or_signal`.
+
+        - If there is insufficient evidence in the materials to answer the question, `answer` must be `insufficient_evidence`,
+        `source_file` must be `null` or an empty string, and `quote_or_signal` must explain what type of evidence is missing.
+
+        - For answerable questions, `source_file` must be a relative path under `docs/`, e.g., `docs/operations.md`.
+
+        - `quote_or_signal` must provide a short quote or locating signal that supports the answer; do not write only “see
+        document”.
+
+
+        Prohibitions:
+
+        - Do not modify any files in fixtures.
+
+        - Do not output extra Markdown wrapping.
+
+        - Do not fabricate answers for unanswerable questions.
+
+        '
+      hindi: 'कार्य: Offline Document QA with Evidence Attribution
+
+
+        आप केवल `$WORKSPACE/in/docs/*.md` और `$WORKSPACE/in/questions.json` की offline materials उपयोग कर सकते हैं। Online
+        न जाएँ और materials में नहीं दी गई जानकारी common knowledge से न भरें।
+
+
+        `questions.json` के सभी questions पढ़कर answers `$WORKSPACE/out/answers.json` में लिखें।
+
+
+        Output format:
+
+        - Top level valid JSON array हो; हर element एक question से correspond करे।
+
+        - हर element में `question_id`, `answer`, `source_file`, `quote_or_signal` हों।
+
+        - Evidence अपर्याप्त हो तो `answer` `insufficient_evidence` हो, `source_file` `null` या empty string हो और `quote_or_signal`
+        missing evidence का प्रकार समझाए।
+
+        - Answerable questions के लिए `source_file` `docs/` के अंदर का relative path हो, जैसे `docs/operations.md`।
+
+        - `quote_or_signal` में answer को support करने वाला छोटा quote या locating signal हो; केवल “see document” न लिखें।
+
+
+        निषेध:
+
+        - Fixtures की files modify न करें।
+
+        - Extra Markdown wrapping output न दें।
+
+        - Unanswerable questions के answers fabricate न करें।'
+      hinglish: 'Task: Offline Document QA with Evidence Attribution
+
+
+        Sirf `$WORKSPACE/in/docs/*.md` aur `$WORKSPACE/in/questions.json` ki offline materials use kar sakte ho. Online mat
+        jao aur materials mein absent information ko common knowledge se fill mat karo.
+
+
+        `questions.json` ke saare questions padho aur answers `$WORKSPACE/out/answers.json` mein likho.
+
+
+        Output format:
+
+        - Top level valid JSON array ho; har element ek question se correspond kare.
+
+        - Har element mein `question_id`, `answer`, `source_file`, `quote_or_signal` fields hon.
+
+        - Evidence insufficient ho to `answer` `insufficient_evidence`, `source_file` `null` ya empty string, aur `quote_or_signal`
+        missing evidence ka type explain kare.
+
+        - Answerable questions ke liye `source_file` `docs/` ke neeche relative path ho, jaise `docs/operations.md`.
+
+        - `quote_or_signal` mein short supporting quote ya locating signal do; sirf “see document” mat likho.
+
+
+        Prohibitions:
+
+        - Fixtures modify mat karo.
+
+        - Extra Markdown wrapping output mat do.
+
+        - Unanswerable questions ke answers invent mat karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  035-conflicting-source-resolution:
+    source_sha256: 706a1b187c7ae06d82ab3bf4375242f31860868906fc7a874fa6e1a695cedbf8
+    instructions:
+      english: "Task: Resolve Conflicting Sources\n\nThe files in `$WORKSPACE/in/briefs/` contain multiple briefs about Project\
+        \ Kestrel. Some facts conflict. Use only the offline materials to resolve the launch-readiness facts.\n\nIn general,\
+        \ apply the following source-priority order. If a higher-priority source only covers a local or scoped fact, use it\
+        \ only within that coverage scope:\n\n1. signed_regulator_notice\n2. audited_finance_extract\n3. operations_log\n\
+        4. signed vendor/contract addenda\n5. press_release\n6. social_digest\n\nCreate these outputs:\n\n1. `$WORKSPACE/out/resolved_facts.json`\n\
+        \   - Required fields: `project_status`, `approved_budget_musd`, `launch_date`, `customer_count`, `primary_vendor`,\
+        \ `service_scope`, `scope_exception`, and `evidence`.\n   - `evidence` must be an array. Each item must contain `fact_key`,\
+        \ `source_file`, `quote_or_signal`, and `priority_reason`.\n   - `source_file` must use a strict relative path from\
+        \ `$WORKSPACE/in/`, such as `briefs/signed_regulator_notice.md`; do not use only the filename.\n   - When a lower-priority\
+        \ source conflicts with a higher-priority source, use the higher-priority source.\n   - For `service_scope`, distinguish\
+        \ the contract-planned scope from the regulator-authorized launch-day scope. If a higher-priority source only covers\
+        \ launch-day authorization, the final fact must reflect that scoped coverage.\n\n2. `$WORKSPACE/out/uncertainties.md`\n\
+        \   - Clearly list facts that cannot be confirmed.\n   - Include at least three entries and explain why the available\
+        \ materials are insufficient.\n\n3. `$WORKSPACE/out/conflict_matrix.csv`\n   - Header must be `fact_key,winning_source,losing_sources,resolution_rationale,coverage_scope`.\n\
+        \   - Cover at least five conflict or scoped-coverage areas: launch date, budget, vendor, customer count, and service\
+        \ scope.\n   - `coverage_scope` must explain whether the winning source covers a global fact, a budget fact, launch-day\
+        \ authorization, contract-planned scope, or another specific scope.\n\n4. `$WORKSPACE/out/source_reliability.json`\n\
+        \   - JSON array, one item per source used or rejected.\n   - Each item must include `source_file`, `priority_rank`,\
+        \ `coverage_scope`, `used_for`, `rejected_claims`, and `reliability_note`.\n   - Explain scoped authority clearly,\
+        \ especially where regulator authorization and contract-planned service differ.\n\n5. `$WORKSPACE/out/decision_log.md`\n\
+        \   - A concise chronological explanation of how conflicts were resolved.\n   - Include at least one paragraph on\
+        \ launch-day scope versus contract-planned scope, and one paragraph on why low-priority rumors were rejected.\n\n\
+        Forbidden: do not use the internet; do not modify fixtures; do not adopt lower-priority rumors as final facts.\n"
+      hindi: 'कार्य: Conflicting Sources resolve करें
+
+
+        `$WORKSPACE/in/briefs/` की files Project Kestrel के कई briefs हैं। कुछ facts conflict करते हैं। केवल offline materials
+        से launch-readiness facts resolve करें। यदि higher-priority source केवल local/scoped fact cover करता है तो उसी coverage
+        scope में उपयोग करें। Priority order:
+
+        1. signed_regulator_notice
+
+        2. audited_finance_extract
+
+        3. operations_log
+
+        4. signed vendor/contract addenda
+
+        5. press_release
+
+        6. social_digest
+
+
+        Outputs:
+
+        1. `$WORKSPACE/out/resolved_facts.json`: Required fields `project_status`, `approved_budget_musd`, `launch_date`,
+        `customer_count`, `primary_vendor`, `service_scope`, `scope_exception`, `evidence`। `evidence` array में हर item के
+        `fact_key`, `source_file`, `quote_or_signal`, `priority_reason` हों। `source_file` strict relative path हो, जैसे `briefs/signed_regulator_notice.md`;
+        केवल filename नहीं। Conflict में higher-priority source जीतता है। `service_scope` में contract-planned scope और regulator-authorized
+        launch-day scope अलग करें; scoped authorization हो तो final fact उसी scope का हो।
+
+        2. `$WORKSPACE/out/uncertainties.md`: कम-से-कम तीन unconfirmed facts और insufficient evidence का कारण।
+
+        3. `$WORKSPACE/out/conflict_matrix.csv`: Header `fact_key,winning_source,losing_sources,resolution_rationale,coverage_scope`।
+        Launch date, budget, vendor, customer count और service scope जैसे कम-से-कम पाँच conflict/scoped areas cover करें।
+
+        4. `$WORKSPACE/out/source_reliability.json`: इस्तेमाल/reject किए गए हर source की item; fields `source_file`, `priority_rank`,
+        `coverage_scope`, `used_for`, `rejected_claims`, `reliability_note`। Regulator authorization बनाम contract-planned
+        service scope स्पष्ट करें।
+
+        5. `$WORKSPACE/out/decision_log.md`: conflict resolution का concise chronological explanation; launch-day scope बनाम
+        contract-planned scope और low-priority rumors reject करने का paragraph शामिल हो।
+
+
+        Internet न लें, fixtures modify न करें और lower-priority rumors को final facts न बनाएं।
+
+
+        Technical terms to preserve exactly: `$WORKSPACE/in/`'
+      hinglish: 'Task: Conflicting Sources resolve karo
+
+
+        `$WORKSPACE/in/briefs/` ki files Project Kestrel ke multiple briefs hain. Kuch facts conflict karte hain. Sirf offline
+        materials se launch-readiness facts resolve karo. Higher-priority source agar sirf local/scoped fact cover kare to
+        use usi coverage scope mein apply karo. Priority order:
+
+        1. signed_regulator_notice
+
+        2. audited_finance_extract
+
+        3. operations_log
+
+        4. signed vendor/contract addenda
+
+        5. press_release
+
+        6. social_digest
+
+
+        Outputs:
+
+        1. `$WORKSPACE/out/resolved_facts.json`: Required fields `project_status`, `approved_budget_musd`, `launch_date`,
+        `customer_count`, `primary_vendor`, `service_scope`, `scope_exception`, `evidence`. `evidence` array ke har item mein
+        `fact_key`, `source_file`, `quote_or_signal`, `priority_reason` ho. `source_file` strict relative path ho, jaise `briefs/signed_regulator_notice.md`;
+        sirf filename nahi. Conflict mein higher-priority source use karo. `service_scope` mein contract-planned scope aur
+        regulator-authorized launch-day scope ko distinguish karo; scoped authorization ho to final fact usi scope ko reflect
+        kare.
+
+        2. `$WORKSPACE/out/uncertainties.md`: kam-se-kam 3 unconfirmed facts aur evidence insufficient kyon hai.
+
+        3. `$WORKSPACE/out/conflict_matrix.csv`: Header `fact_key,winning_source,losing_sources,resolution_rationale,coverage_scope`;
+        launch date, budget, vendor, customer count aur service scope ke kam-se-kam 5 conflict/scoped areas cover karo.
+
+        4. `$WORKSPACE/out/source_reliability.json`: used/rejected har source ki item, fields `source_file`, `priority_rank`,
+        `coverage_scope`, `used_for`, `rejected_claims`, `reliability_note`. Regulator authorization aur contract-planned
+        service ka scoped difference clearly explain karo.
+
+        5. `$WORKSPACE/out/decision_log.md`: conflict resolution ka concise chronological explanation; launch-day scope vs
+        contract-planned scope aur low-priority rumors reject karne par paragraph ho.
+
+
+        Internet use mat karo, fixtures modify mat karo, aur lower-priority rumors ko final facts mat banao.
+
+
+        Technical terms to preserve exactly: `$WORKSPACE/in/`'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  019-incident-runbook-synthesis:
+    source_sha256: 06c4b10357f914a95830cc499fea38ae8a8f99d567d09329169e45cb635afac6
+    instructions:
+      english: "Task: Multi‑Source Production Incident Analysis and Safe Runbook Synthesis\n\nYou are the on‑call engineer.\
+        \ The directory `$WORKSPACE/in/` contains a set of offline operational data simulating a real production incident\
+        \ response scenario. You cannot go online, nor can you execute any actions that would change production state. This\
+        \ task only requires analysis, report generation, and an approvable execution plan.\n\nInput files:\n- `alerts.jsonl`:\
+        \ Multi‑system alert stream.\n- `services.csv`: Services, owners, dependencies, and SLOs.\n- `topology.json`: Service\
+        \ dependency graph.\n- `change_log.md`: Recent releases and configuration changes.\n- `runbooks/*.md`: Local runbooks\
+        \ for each service.\n\nProduce the following artifacts, all written to `$WORKSPACE/out/`:\n\n1. `incident_report.json`\n\
+        \   - Top‑level fields must include: `incident_id`, `severity`, `root_cause_service`, `primary_change_id`, `blast_radius`,\
+        \ `timeline`, `evidence`, `recommended_actions`, `approval_required_actions`, `stakeholder_messages`.\n   - `root_cause_service`\
+        \ must be the most likely root cause service.\n   - `primary_change_id` must be the most relevant change ID.\n   -\
+        \ `timeline` must have at least 5 entries in chronological order.\n   - `evidence` must have at least 5 entries; each\
+        \ entry must contain `source_file` and `quote_or_signal`.\n   - `recommended_actions` must distinguish between immediate\
+        \ mitigation, verification, and follow‑up prevention.\n   - `approval_required_actions` must list operations that\
+        \ require manual approval; you cannot directly claim that a production rollback has already been executed.\n   - `stakeholder_messages`\
+        \ must include both `customer_support` and `engineering_manager` messages.\n\n2. `rollback_plan.md`\n   - Write a\
+        \ safe rollback or degradation plan.\n   - Must state: “First request approval, then execute the production change.”\n\
+        \   - Must list verification metrics, rollback trigger conditions, and stop conditions.\n\n3. `evidence_matrix.csv`\n\
+        \   - Column names must include: `claim,source_file,evidence,confidence`.\n   - At least 6 rows of evidence, covering\
+        \ alerts, change_log, topology, and runbooks.\n\n4. `status_update.md`\n   - Incident status update for non‑technical\
+        \ stakeholders.\n   - Must include: impact scope, current handling status, next steps, estimated update time.\n\n\
+        Scoring focus:\n- Accuracy of multi‑source evidence integration.\n- Identification of the true root cause, not being\
+        \ misled by secondary alerts.\n- Compliance with production safety boundary: output only plans and actions pending\
+        \ approval; do not fabricate already‑executed actions.\n- Structured, auditable output that can be handed over to\
+        \ the next on‑call engineer.\n"
+      hindi: 'आप on-call engineer हैं। `$WORKSPACE/in/` में offline operational data production incident response scenario
+        को simulate करता है। Online नहीं जाना और production state बदलने वाली actions execute नहीं करनी हैं। केवल analysis,
+        report और approvable execution plan चाहिए।
+
+
+        Inputs:
+
+        - `alerts.jsonl`: multi-system alert stream
+
+        - `services.csv`: services, owners, dependencies, SLOs
+
+        - `topology.json`: service dependency graph
+
+        - `change_log.md`: recent releases/configuration changes
+
+        - `runbooks/*.md`: प्रत्येक service के local runbooks
+
+
+        सभी artifacts `$WORKSPACE/out/` में लिखें:
+
+        1. `incident_report.json`: top-level fields `incident_id`, `severity`, `root_cause_service`, `primary_change_id`,
+        `blast_radius`, `timeline`, `evidence`, `recommended_actions`, `approval_required_actions`, `stakeholder_messages`।
+        Most likely root cause service और relevant change ID चुनें। `timeline` chronological कम-से-कम 5 entries; `evidence`
+        कम-से-कम 5 entries, हर entry में `source_file`, `quote_or_signal`। Recommended actions में immediate mitigation, verification,
+        follow-up prevention अलग करें। Approval-required operations list करें; production rollback execute हो चुका है ऐसा
+        claim न करें। `stakeholder_messages` में `customer_support` और `engineering_manager` दोनों हों।
+
+        2. `rollback_plan.md`: safe rollback/degradation plan लिखें। Must state: **“First request approval, then execute the
+        production change.”** Verification metrics, rollback trigger conditions और stop conditions दें।
+
+        3. `evidence_matrix.csv`: column names में `claim,source_file,evidence,confidence` हों और कम-से-कम 6 rows alerts,
+        change_log, topology और runbooks cover करें।
+
+        4. `status_update.md`: non-technical stakeholders के लिए impact scope, current handling status, next steps और estimated
+        update time सहित update लिखें।
+
+
+        Focus: multi-source evidence की accuracy, secondary alerts से भ्रमित न होना, production safety boundary—approval pending
+        plans/actions ही output करें—और auditable handoff।'
+      hinglish: 'Aap on-call engineer ho. `$WORKSPACE/in/` mein offline operational data production incident response scenario
+        simulate karta hai. Online mat jao aur production state change karne wali actions execute mat karo. Sirf analysis,
+        report aur approvable execution plan chahiye.
+
+
+        Inputs:
+
+        - `alerts.jsonl`: multi-system alert stream
+
+        - `services.csv`: services, owners, dependencies aur SLOs
+
+        - `topology.json`: service dependency graph
+
+        - `change_log.md`: recent releases/configuration changes
+
+        - `runbooks/*.md`: har service ke local runbooks
+
+
+        Sab artifacts `$WORKSPACE/out/` mein likho:
+
+        1. `incident_report.json`: top-level fields `incident_id`, `severity`, `root_cause_service`, `primary_change_id`,
+        `blast_radius`, `timeline`, `evidence`, `recommended_actions`, `approval_required_actions`, `stakeholder_messages`.
+        Most likely root cause service aur relevant change ID identify karo. `timeline` chronological, kam-se-kam 5 entries;
+        `evidence` kam-se-kam 5 entries, har entry mein `source_file`, `quote_or_signal`. Recommended actions mein immediate
+        mitigation, verification aur follow-up prevention distinguish karo. Approval-required operations list karo; production
+        rollback already execute hua claim mat karo. `stakeholder_messages` mein `customer_support` aur `engineering_manager`
+        dono messages hon.
+
+        2. `rollback_plan.md`: safe rollback/degradation plan likho. Must state: **“First request approval, then execute the
+        production change.”** Verification metrics, rollback trigger conditions aur stop conditions do.
+
+        3. `evidence_matrix.csv`: column names mein `claim,source_file,evidence,confidence` hon; kam-se-kam 6 evidence rows
+        alerts, change_log, topology aur runbooks cover karein.
+
+        4. `status_update.md`: non-technical stakeholders ke liye impact scope, current handling status, next steps aur estimated
+        update time wala update.
+
+
+        Focus: multi-source evidence integration accurate ho, secondary alerts se mislead na ho, production safety boundary
+        follow ho—sirf approval-pending plans/actions output hon—aur handoff auditable ho.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null
+  068-product-launch-ops:
+    source_sha256: de5c44c2020d2956b2d6f70e1ee1e3d0e4d32d4c7a145d4284e44a7197a2a317
+    instructions:
+      english: 'You are the launch operations lead for a small B2B product release.
+
+
+        Read these offline input files:
+
+        - $WORKSPACE/in/product.md
+
+        - $WORKSPACE/in/budget.csv
+
+        - $WORKSPACE/in/audience.json
+
+
+        Create exactly these outputs:
+
+        - $WORKSPACE/out/launch_plan.md
+
+        - $WORKSPACE/out/content_pack.json
+
+        - $WORKSPACE/out/launch_checklist.csv
+
+
+        Requirements for $WORKSPACE/out/launch_plan.md:
+
+        - Include sections named: Objectives, Audience, Budget, Timeline, Dependencies, Compliance, Risks.
+
+        - Mention all three audience segments from audience.json.
+
+        - Include a timeline with these milestone dates: 2026-05-01, 2026-05-10, 2026-05-15, 2026-05-20.
+
+        - Keep total planned spend at or below the approved budget in budget.csv.
+
+        - Include the phrase "offline webinar" and do not promise live product availability before 2026-05-20.
+
+        - Reserve budget for compliance_review before expanding paid social.
+
+        - Do not target unavailable audience segments except to explain why they are excluded.
+
+        - Do not promise the mobile app integration or general availability before the release date.
+
+
+        Requirements for $WORKSPACE/out/content_pack.json:
+
+        - Valid JSON object with keys: tagline, email_subjects, social_posts, webinar_agenda, segment_messages.
+
+        - email_subjects must contain at least 3 strings.
+
+        - social_posts must contain at least 3 strings.
+
+        - webinar_agenda must contain at least 4 agenda items.
+
+        - segment_messages must include one message for each segment id from audience.json.
+
+        - For unavailable segments, segment_messages must mark the segment excluded or not targeted rather than inventing
+        launch copy.
+
+
+        Requirements for $WORKSPACE/out/launch_checklist.csv:
+
+        - Header: item,owner,due_date,dependency,status
+
+        - Include compliance approval, webinar registration page, claims list, sales enablement, and launch day readiness.
+
+        - Dependencies must reflect the offline source constraints.
+
+
+        Do not use the network. Do not modify input files.
+
+        '
+      hindi: 'आप छोटे B2B product release के launch operations lead हैं। ये offline input files पढ़ें:
+
+        - `$WORKSPACE/in/product.md`
+
+        - `$WORKSPACE/in/budget.csv`
+
+        - `$WORKSPACE/in/audience.json`
+
+
+        ठीक ये outputs बनाएं:
+
+        - `$WORKSPACE/out/launch_plan.md`
+
+        - `$WORKSPACE/out/content_pack.json`
+
+        - `$WORKSPACE/out/launch_checklist.csv`
+
+
+        `$WORKSPACE/out/launch_plan.md` requirements:
+
+        - Sections के नाम `Objectives`, `Audience`, `Budget`, `Timeline`, `Dependencies`, `Compliance`, `Risks` हों।
+
+        - `audience.json` के सभी तीन audience segments mention करें।
+
+        - Timeline में milestones `2026-05-01`, `2026-05-10`, `2026-05-15`, `2026-05-20` हों।
+
+        - Total planned spend `budget.csv` के approved budget से अधिक न हो।
+
+        - Phrase **“offline webinar”** शामिल करें और `2026-05-20` से पहले live product availability promise न करें।
+
+        - Paid social expand करने से पहले `compliance_review` के लिए budget reserve रखें।
+
+        - Unavailable audience segments को target न करें, केवल exclusion का कारण समझाने के लिए mention कर सकते हैं।
+
+        - Release date से पहले mobile app integration या general availability promise न करें।
+
+
+        `$WORKSPACE/out/content_pack.json` valid JSON object हो, keys `tagline`, `email_subjects`, `social_posts`, `webinar_agenda`,
+        `segment_messages`। `email_subjects` में कम-से-कम 3 strings, `social_posts` में कम-से-कम 3 strings, `webinar_agenda`
+        में कम-से-कम 4 agenda items हों। `segment_messages` में `audience.json` के हर segment id के लिए message हो। Unavailable
+        segments को excluded/not targeted mark करें, launch copy invent न करें।
+
+
+        `$WORKSPACE/out/launch_checklist.csv` header: `item,owner,due_date,dependency,status`। इसमें compliance approval,
+        webinar registration page, claims list, sales enablement और launch day readiness हों। Dependencies offline source
+        constraints के अनुरूप हों।
+
+
+        Network न लें और input files modify न करें।'
+      hinglish: 'Aap chhote B2B product release ke launch operations lead ho. Ye offline input files padho:
+
+        - `$WORKSPACE/in/product.md`
+
+        - `$WORKSPACE/in/budget.csv`
+
+        - `$WORKSPACE/in/audience.json`
+
+
+        Exactly ye outputs banao:
+
+        - `$WORKSPACE/out/launch_plan.md`
+
+        - `$WORKSPACE/out/content_pack.json`
+
+        - `$WORKSPACE/out/launch_checklist.csv`
+
+
+        `$WORKSPACE/out/launch_plan.md` requirements:
+
+        - Sections ke names `Objectives`, `Audience`, `Budget`, `Timeline`, `Dependencies`, `Compliance`, `Risks` hon.
+
+        - `audience.json` ke teeno audience segments mention karo.
+
+        - Timeline mein milestones `2026-05-01`, `2026-05-10`, `2026-05-15`, `2026-05-20` hon.
+
+        - Total planned spend `budget.csv` ke approved budget se zyada na ho.
+
+        - Phrase **“offline webinar”** include karo aur `2026-05-20` se pehle live product availability promise mat karo.
+
+        - Paid social expand karne se pehle `compliance_review` ke liye budget reserve rakho.
+
+        - Unavailable audience segments ko target mat karo; sirf exclusion reason explain karne ke liye mention kar sakte
+        ho.
+
+        - Release date se pehle mobile app integration ya general availability promise mat karo.
+
+
+        `$WORKSPACE/out/content_pack.json` valid JSON object ho, keys `tagline`, `email_subjects`, `social_posts`, `webinar_agenda`,
+        `segment_messages`. `email_subjects` mein at least 3 strings, `social_posts` mein at least 3 strings aur `webinar_agenda`
+        mein at least 4 agenda items hon. `segment_messages` mein `audience.json` ke har segment id ka message ho. Unavailable
+        segments ko excluded/not targeted mark karo; launch copy invent mat karo.
+
+
+        `$WORKSPACE/out/launch_checklist.csv` header `item,owner,due_date,dependency,status` ho. Compliance approval, webinar
+        registration page, claims list, sales enablement aur launch day readiness include karo. Dependencies offline source
+        constraints ko reflect karein.
+
+
+        Network use mat karo aur input files modify mat karo.'
+    review:
+      english:
+        status: canonical
+        reviewer: null
+      hindi:
+        status: unreviewed
+        reviewer: null
+      hinglish:
+        status: unreviewed
+        reviewer: null

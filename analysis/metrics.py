@@ -52,6 +52,10 @@ def success_rates(rows: list[dict]) -> dict[str, float]:
     totals: dict[str, int] = {}
     successes: dict[str, int] = {}
     for row in rows:
+        # Infrastructure errors are not model outcomes.  Legacy rows do not
+        # have a status column, so missing status remains compatible.
+        if row.get("status") not in (None, "", "completed", "legacy"):
+            continue
         language = row["language"]
         totals[language] = totals.get(language, 0) + 1
         successes[language] = successes.get(language, 0) + int(row["success"])

@@ -14,6 +14,8 @@ data/results/*
 data/traces/*
 !data/results/.gitkeep
 !data/traces/.gitkeep
+data/phase1/
+benchmark/translations/phase1.partial.yaml
 
 tmp/
 

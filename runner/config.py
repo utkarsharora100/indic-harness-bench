@@ -36,3 +36,23 @@ class ExperimentConfig:
     @property
     def storage(self) -> dict[str, Any]:
         return self.data["storage"]
+
+    @property
+    def inference(self) -> dict[str, Any]:
+        return self.data.get("inference", {})
+
+    @property
+    def task_root(self) -> Path:
+        configured = self.experiment.get("prepared_tasks_root", "benchmark/tasks")
+        return (self.root / configured).resolve()
+
+    @property
+    def experiment_id(self) -> str:
+        return str(self.experiment.get("id", self.experiment.get("name", self.path.stem)))
+
+    @property
+    def configured_task_ids(self) -> list[str]:
+        values = self.experiment.get("tasks", [])
+        if not isinstance(values, list) or not values:
+            raise ValueError("experiment.tasks must be a non-empty list")
+        return [str(value) for value in values]

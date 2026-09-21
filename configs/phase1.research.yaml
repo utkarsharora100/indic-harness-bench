@@ -1,24 +1,60 @@
 # Research configuration for the 24-task language-only study.
-# Populate benchmark/task_selection.yaml with IDs from a pinned Harness-Bench revision first.
 experiment:
   name: phase1_language_comparison
+  dataset_manifest: benchmark/task_selection.yaml
+  prepared_tasks_root: data/phase1/tasks
   seed: 17
   repetitions: 3
   languages: [english, hindi, hinglish]
-  tasks: []
+  tasks:
+    - 016-code-repair-pytest
+    - 039-repo-architecture-map
+    - 040-test-coverage-fill
+    - 042-api-schema-migration
+    - 043-db-migration-safety
+    - 087-cli-parser-bug-tests
+    - 049-excel-like-cleaning
+    - 050-multitable-join-analysis
+    - 051-sql-query-report
+    - 053-anomalous-transaction-detect
+    - 054-budget-variance-analysis
+    - 001-file
+    - 020-archive-checksum
+    - 021-batch-rename-transform
+    - 079-smallfile-batch-reject-ledger
+    - 004-meeting-summary
+    - 005-email-triage
+    - 025-meeting-action-tracker
+    - 028-email-thread-merge
+    - 012-doc-synthesis
+    - 033-offline-knowledge-qa
+    - 035-conflicting-source-resolution
+    - 019-incident-runbook-synthesis
+    - 068-product-launch-ops
   agents: [react]
-  models: [local]
+  models: [university_gpu]
 
 generation:
   temperature: 0.0
   top_p: 1.0
   max_tokens: 2048
+  max_steps: 40
 
 sandbox:
   mode: docker
-  image: python:3.12-slim
+  image: indic-harness-phase1:2026-09-21
+  network: none
+
+inference:
+  provider: university_gpu
+  env_file: .env.uni-gpu.local
+  requested_model_env: INDIC_UNI_GPU_MODEL
+  manifest: data/phase1/model-manifest.json
+  timeout_seconds: 90
+  max_retries: 2
 
 storage:
-  database: data/runs.sqlite
-  traces_dir: data/traces
-  results_dir: data/results
+  experiment_dir: data/phase1/experiment
+  database: data/phase1/experiment/runs.sqlite
+  traces_dir: data/phase1/experiment/traces
+  results_dir: data/phase1/experiment/results

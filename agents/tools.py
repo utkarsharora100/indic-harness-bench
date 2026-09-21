@@ -158,7 +158,14 @@ class WorkspaceTools:
 
     def _run_command(self, command: str) -> dict[str, Any]:
         if self.command_runner is not None:
-            return self.command_runner(command)
+            try:
+                return self.command_runner(command, self.timeout_seconds)
+            except TypeError as exc:
+                # Preserve compatibility with small test doubles that still
+                # expose the original one-argument callback.
+                if "positional" not in str(exc) and "argument" not in str(exc):
+                    raise
+                return self.command_runner(command)
 
         try:
             process = subprocess.run(
