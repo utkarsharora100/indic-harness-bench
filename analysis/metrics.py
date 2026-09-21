@@ -36,6 +36,8 @@ def paired_outcome(english_success: bool, hindi_success: bool, hinglish_success:
         return "both_indic_fail"
     if values == (False, True, True):
         return "english_only_failure"
+    if values == (False, False, False):
+        return "all_fail"
     return "mixed"
 
 

@@ -12,12 +12,12 @@ Experiment runner
      +----------------------+
      |                      |
      v                      v
-Agent adapter           Fresh workspace
+   Agent adapter           Fresh workspace
      |                      |
      +----------+-----------+
                 |
                 v
-              Grader
+        Oracle + process judge
                 |
                 v
          SQLite + JSONL
@@ -30,7 +30,8 @@ Agent adapter           Fresh workspace
 
 `benchmark` owns task definitions and validation.
 
-`agents` owns the common adapter interface, benchmark tools, the ReAct baseline, and external runtime wrappers.
+`agents` owns the common adapter interface, benchmark tools, the ReAct baseline,
+and pinned native harness containers.
 
 `runner` owns orchestration, per-run workspace creation, grading, and persistence.
 
@@ -42,8 +43,14 @@ Agent adapter           Fresh workspace
 
 Every run starts from a clean copy of the task workspace. In Docker mode the copy is mounted into a fresh container. File operations are performed against the mounted workspace; shell commands and the deterministic grader execute inside the container.
 
-External host runtimes such as NanoBot and OpenClaw are wrapped as subprocess adapters. They are not presented as a Docker security boundary by this repository; use the corresponding native Harness-Bench adapters for a fully controlled production evaluation.
+The corrected study does not use host-process fallbacks for NanoBot or
+OpenClaw. Native harness images receive only the workspace and a narrow
+OpenAI-compatible proxy route. The university endpoint and bearer key remain
+outside agent containers.
 
 ## Trace
 
-The ReAct adapter records externally observable tool calls, arguments, results, step numbers, and aggregate usage. Private chain-of-thought is not stored.
+The ReAct and native adapters record externally observable actions, tool
+arguments/results where available, step numbers, and aggregate usage. The
+post-run process judge receives a normalized observable trace and never private
+chain-of-thought.

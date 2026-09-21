@@ -1,0 +1,66 @@
+# Corrective 648-cell main study: 24 tasks x 3 languages x 3 harnesses x 3 attempts.
+experiment:
+  name: phase1_corrected_v1
+  dataset_manifest: benchmark/task_selection.yaml
+  prepared_tasks_root: data/phase1/tasks
+  agents_manifest: configs/agents.phase1.yaml
+  models_manifest: configs/models.yaml
+  seed: 1701
+  repetitions: 3
+  languages: [english, hindi, hinglish]
+  tasks:
+    - 016-code-repair-pytest
+    - 039-repo-architecture-map
+    - 040-test-coverage-fill
+    - 042-api-schema-migration
+    - 043-db-migration-safety
+    - 087-cli-parser-bug-tests
+    - 049-excel-like-cleaning
+    - 050-multitable-join-analysis
+    - 051-sql-query-report
+    - 053-anomalous-transaction-detect
+    - 054-budget-variance-analysis
+    - 001-file
+    - 020-archive-checksum
+    - 021-batch-rename-transform
+    - 079-smallfile-batch-reject-ledger
+    - 004-meeting-summary
+    - 005-email-triage
+    - 025-meeting-action-tracker
+    - 028-email-thread-merge
+    - 012-doc-synthesis
+    - 033-offline-knowledge-qa
+    - 035-conflicting-source-resolution
+    - 019-incident-runbook-synthesis
+    - 068-product-launch-ops
+  agents: [react, nanobot, openclaw]
+  models: [university_gpu]
+  version: corrected-v1
+
+generation:
+  temperature: 0.0
+  top_p: 1.0
+  max_tokens: 2048
+  max_steps: 40
+
+sandbox:
+  mode: docker
+  image: indic-harness-phase1:2026-09-21
+  network: none
+
+inference:
+  provider: university_gpu
+  env_file: .env.uni-gpu.local
+  requested_model_env: INDIC_UNI_GPU_MODEL
+  manifest: data/phase1/corrected/model-manifest.json
+  timeout_seconds: 90
+  max_retries: 2
+  proxy:
+    enabled: true
+    public_model: phase1-university-model
+
+storage:
+  experiment_dir: data/phase1/corrected
+  database: data/phase1/corrected/runs.sqlite
+  traces_dir: data/phase1/corrected/traces
+  results_dir: data/phase1/corrected/results

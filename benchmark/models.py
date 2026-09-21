@@ -37,8 +37,10 @@ class UpstreamTask(BaseModel):
 
     source_dir: str = "source"
     prompt_file: str = "prompt.txt"
+    prompt_files: list[str] = Field(default_factory=list)
     fixtures_dir: str = "fixtures"
     oracle_module: str = "oracle_grade.py"
+    hooks_module: str = "hooks.py"
     expected_outcome_score: float = Field(default=1.0, ge=0.0, le=1.0)
 
 

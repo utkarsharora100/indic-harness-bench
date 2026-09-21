@@ -4,9 +4,12 @@ from pathlib import Path
 from agents.base import AgentRequest
 from agents.react import ReactAgent
 from agents.tools import WorkspaceTools
+from analysis.metrics import paired_outcome
 from analysis.phase1 import paired_language_deltas, paired_outcomes
+from benchmark.upstream import after_round_runtime, prepare_runtime, render_runtime_template
 from runner.redaction import redact
 from runner.runner import stable_cell_id
+from runner.log import RunStore
 
 
 class _MalformedCompletions:
@@ -93,3 +96,63 @@ def test_no_json_trace_like_secret_is_required_for_redaction():
     assert json.dumps(redact(payload, ("sk-private", "http://private"))) == (
         '{"api_key": "[REDACTED]", "nested": {"url": "[REDACTED]"}}'
     )
+
+
+def test_workspace_mount_path_is_equivalent_to_relative_path(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    tools = WorkspaceTools(workspace, timeout_seconds=5)
+    assert tools.execute("write_file", {"path": "/workspace/out.txt", "content": "ok"})["ok"]
+    assert tools.execute("read_file", {"path": "out.txt"})["content"] == "ok"
+
+
+def test_upstream_hook_variables_are_rendered(tmp_path: Path):
+    task = tmp_path / "task"
+    task.mkdir()
+    (task / "hooks.py").write_text(
+        "def prepare_runtime(context):\n"
+        "    return {'TASK_ID': 'T-1'}\n",
+        encoding="utf-8",
+    )
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    state = prepare_runtime(task, tmp_path, workspace, "hooks.py")
+    assert state == {"TASK_ID": "T-1"}
+    assert render_runtime_template("$WORKSPACE/$TASK_ID", workspace="/workspace", runtime_env=state) == "/workspace/T-1"
+
+
+def test_upstream_after_round_hook_receives_task_context(tmp_path: Path):
+    task = tmp_path / "task"
+    task.mkdir()
+    (task / "hooks.py").write_text(
+        "def after_round(context, state, result):\n"
+        "    assert context['task'].task_dir.name == 'task'\n"
+        "    assert context['round_index'] == 0\n"
+        "    assert result.ok\n"
+        "    return {'AFTER': 'yes'}\n",
+        encoding="utf-8",
+    )
+    state = after_round_runtime(
+        task,
+        tmp_path,
+        tmp_path / "workspace",
+        "hooks.py",
+        {"BEFORE": "yes"},
+        type("Result", (), {"ok": True})(),
+    )
+    assert state == {"BEFORE": "yes", "AFTER": "yes"}
+
+
+def test_all_fail_is_not_reported_as_mixed():
+    assert paired_outcome(False, False, False) == "all_fail"
+
+
+def test_full_grade_details_are_persisted(tmp_path: Path):
+    store = RunStore(tmp_path / "runs.sqlite")
+    try:
+        store.add_grade("run", "task_grader", False, "x" * 20000, score=0.5)
+        row = store.connection.execute("SELECT length(details), score FROM grade WHERE run_id='run'").fetchone()
+        assert row[0] == 20000
+        assert row[1] == 0.5
+    finally:
+        store.close()

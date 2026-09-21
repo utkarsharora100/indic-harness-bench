@@ -1,0 +1,47 @@
+# Corrective 45-cell pilot: 5 tasks x 3 languages x 3 harnesses.
+experiment:
+  name: phase1_corrected_pilot_v1
+  dataset_manifest: benchmark/task_selection.yaml
+  prepared_tasks_root: data/phase1/tasks
+  agents_manifest: configs/agents.phase1.yaml
+  models_manifest: configs/models.yaml
+  seed: 1701
+  repetitions: 1
+  languages: [english, hindi, hinglish]
+  tasks:
+    - 001-file
+    - 016-code-repair-pytest
+    - 050-multitable-join-analysis
+    - 025-meeting-action-tracker
+    - 019-incident-runbook-synthesis
+  agents: [react, nanobot, openclaw]
+  models: [university_gpu]
+  version: corrected-v1
+
+generation:
+  temperature: 0.0
+  top_p: 1.0
+  max_tokens: 2048
+  max_steps: 40
+
+sandbox:
+  mode: docker
+  image: indic-harness-phase1:2026-09-21
+  network: none
+
+inference:
+  provider: university_gpu
+  env_file: .env.uni-gpu.local
+  requested_model_env: INDIC_UNI_GPU_MODEL
+  manifest: data/phase1/corrected/pilot-model-manifest.json
+  timeout_seconds: 90
+  max_retries: 2
+  proxy:
+    enabled: true
+    public_model: phase1-university-model
+
+storage:
+  experiment_dir: data/phase1/corrected/pilot
+  database: data/phase1/corrected/pilot/runs.sqlite
+  traces_dir: data/phase1/corrected/pilot/traces
+  results_dir: data/phase1/corrected/pilot/results

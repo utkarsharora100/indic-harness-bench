@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -20,7 +21,11 @@ LANGUAGES = ("english", "hindi", "hinglish")
 
 def tree_sha256(root: Path) -> str:
     digest = hashlib.sha256()
-    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+    for path in sorted(
+        item
+        for item in root.rglob("*")
+        if item.is_file() and "__pycache__" not in item.parts and item.suffix not in {".pyc", ".pyo"}
+    ):
         relative = path.relative_to(root).as_posix().encode("utf-8")
         digest.update(relative)
         digest.update(b"\0")
@@ -62,6 +67,20 @@ def load_translations(path: Path) -> dict[str, Any]:
     return data
 
 
+def validate_python_asset(path: Path, required_callable: str | None = None) -> None:
+    module_name = f"phase1_asset_{hashlib.sha256(str(path).encode()).hexdigest()[:16]}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ValueError(f"Cannot import pinned Python asset: {path}")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        raise ValueError(f"Pinned Python asset failed to import: {path}: {exc}") from exc
+    if required_callable and not callable(getattr(module, required_callable, None)):
+        raise ValueError(f"Pinned Python asset lacks {required_callable}(): {path}")
+
+
 def validate_categories(selection: dict[str, Any]) -> None:
     counts: dict[str, int] = {}
     for item in selection["tasks"]:
@@ -83,8 +102,10 @@ def build_task_definition(
 ) -> dict[str, Any]:
     timeout = int(source_definition.get("timeout_sec", 600))
     prompt_file = str(source_definition.get("prompt_file", "prompt.txt"))
+    prompt_files = [str(value) for value in (source_definition.get("prompt_files") or [])]
     fixtures_dir = str(source_definition.get("fixtures_dir", "fixtures"))
     oracle_module = str(source_definition.get("oracle_module", "oracle_grade.py"))
+    hooks_module = str(source_definition.get("hooks_module", "hooks.py"))
     return {
         "task_id": task_id,
         "category": category,
@@ -99,8 +120,10 @@ def build_task_definition(
         "upstream": {
             "source_dir": "source",
             "prompt_file": prompt_file,
+            "prompt_files": prompt_files,
             "fixtures_dir": fixtures_dir,
             "oracle_module": oracle_module,
+            "hooks_module": hooks_module,
             "expected_outcome_score": 1.0,
         },
     }
@@ -125,6 +148,13 @@ def prepare(
         )
 
     prepared: list[dict[str, Any]] = []
+    upstream_default_rubric = source / "grading" / "default_rubric.py"
+    if not upstream_default_rubric.is_file():
+        raise RuntimeError(f"Pinned source is missing grading/default_rubric.py: {upstream_default_rubric}")
+    if not check_only:
+        rubric_destination = destination / "grading" / "default_rubric.py"
+        rubric_destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(upstream_default_rubric, rubric_destination)
     for item in selection["tasks"]:
         task_id = item["task_id"]
         source_task = source / "tasks" / task_id
@@ -133,6 +163,16 @@ def prepare(
         missing = [name for name in REQUIRED_SOURCE_FILES if not (source_task / name).exists()]
         if missing:
             raise ValueError(f"{task_id} is missing required files: {', '.join(missing)}")
+        source_definition = yaml.safe_load(
+            (source_task / "task.yaml").read_text(encoding="utf-8")
+        ) or {}
+        validate_python_asset(source_task / str(source_definition.get("oracle_module", "oracle_grade.py")), "score_workspace")
+        hooks_path = source_task / str(source_definition.get("hooks_module", "hooks.py"))
+        if hooks_path.is_file():
+            validate_python_asset(hooks_path)
+        rubric_path = source_task / "llm_rubric.py"
+        if rubric_path.is_file():
+            validate_python_asset(rubric_path)
         source_hash = tree_sha256(source_task)
         expected_hash = item.get("source_sha256")
         if expected_hash and expected_hash != source_hash:
@@ -156,9 +196,6 @@ def prepare(
             if errors:
                 raise ValueError(f"Invalid {language} translation for {task_id}: {'; '.join(errors)}")
 
-        source_definition = yaml.safe_load(
-            (source_task / "task.yaml").read_text(encoding="utf-8")
-        ) or {}
         definition = build_task_definition(
             task_id, item["category"], revision, source_definition, instructions
         )
@@ -171,10 +208,13 @@ def prepare(
             else:
                 target.mkdir(parents=True, exist_ok=False)
                 shutil.copytree(source_task, target / "source")
-                (target / "task.yaml").write_text(
-                    yaml.safe_dump(definition, allow_unicode=True, sort_keys=False), encoding="utf-8"
-                )
                 (target / ".source_sha256").write_text(source_hash + "\n", encoding="utf-8")
+            # Refresh the generated wrapper even when the ignored cache was
+            # prepared by an older runner version.  The pinned source tree is
+            # still protected by the hash check above.
+            (target / "task.yaml").write_text(
+                yaml.safe_dump(definition, allow_unicode=True, sort_keys=False), encoding="utf-8"
+            )
             TaskDefinition.from_file(target / "task.yaml")
         prepared.append({"task_id": task_id, "category": item["category"], "source_sha256": source_hash})
 

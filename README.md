@@ -1,8 +1,12 @@
 # Indic-Harness-Bench
 
-Indic-Harness-Bench is a Phase 1 benchmark for measuring how instruction language affects executable agent workflows.
+Indic-Harness-Bench is a corrective Phase I benchmark for measuring how
+instruction language interacts with executable agent harnesses.
 
-Phase 1 compares English, Hindi, and Hinglish instructions while keeping the task, environment, tools, model, agent configuration, execution budget, and grader fixed for the language-only experiment.
+The corrected study compares English, Hindi, and Latin-script Hinglish across
+ReAct, NanoBot, and OpenClaw while keeping task resources, model, budgets, and
+grading fixed. The earlier 216-cell language-only result is retained as
+superseded data and is never pooled with the corrected experiment.
 
 ## Repository layout
 
@@ -62,14 +66,16 @@ the full matrix as described in [the protocol](docs/phase1_protocol.md).
 ```powershell
 py -3.14 -m scripts.prepare_phase1 --source ..\harness-bench
 docker build -f docker/phase1.Dockerfile -t indic-harness-phase1:2026-09-21 .
-py -3.14 -m scripts.preflight_phase1 --config configs/phase1.pilot.yaml --source ..\harness-bench
-py -3.14 -m runner.cli run --config configs/phase1.pilot.yaml --resume
-py -3.14 -m runner.cli report --database data/phase1/pilot/runs.sqlite --output data/phase1/pilot/provisional_report.md
+py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.pilot.yaml --source ..\harness-bench
+py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot.yaml --resume
+py -3.14 -m runner.cli judge --config configs/phase1.corrected.pilot.yaml
+py -3.14 -m runner.cli corrected-report --config configs/phase1.corrected.pilot.yaml
+py -3.14 scripts/build_corrected_pdf.py --report data/phase1/corrected/pilot/provisional_report.json --output data/phase1/corrected/pilot/provisional_report.pdf
 ```
 
 Raw databases, traces, model manifests, and provisional reports live under
-ignored `data/phase1/` storage. They are never mixed with the old prototype
-pilot database.
+ignored `data/phase1/` storage. Corrected runs use separate databases and
+experiment IDs and are never mixed with the old prototype database.
 
 ## Harness-Bench import
 
@@ -93,13 +99,20 @@ The translations file must provide `english`, `hindi`, and `hinglish` fields. Im
 
 ### NanoBot
 
-`agents/external.py` supports native external runtimes. The supplied NanoBot configuration uses its documented one-shot form, `nanobot agent -m ...`.
+The corrected configuration requires a pinned `indic-harness-nanobot:phase1-pinned`
+container image and immutable `image_digest` in `configs/agents.phase1.yaml`.
+The preflight intentionally fails if the image or internal network is absent; it
+does not fall back to a host process.
 
 ### OpenClaw
 
-The supplied OpenClaw configuration uses the documented one-shot command surface with `openclaw agent --local ...`.
+The corrected configuration likewise requires a pinned
+`indic-harness-openclaw:phase1-pinned` image, frozen `image_digest`, and the
+Docker-internal model-proxy network. It runs against the fresh workspace with
+an isolated model-proxy route.
 
-The external adapters are intentionally disabled in the default Phase 1 configuration. The language-only study should start with one fixed agent and one fixed model.
+The old host-process wrappers remain for compatibility but are not valid for
+the corrected study.
 
 ## Evaluation
 
@@ -113,7 +126,12 @@ The run is successful only when the configured expected exit code is returned. I
 
 ## Metrics
 
-The primary metric is success rate by language. Secondary metrics include execution time, token usage when the backend reports it, tool calls, failed tool calls, and run-level recovery behavior.
+The corrected primary metric is task-balanced continuous oracle outcome and
+paired Hindi/Hinglish deltas against English within each harness. Perfect
+completion is secondary. The paper-style completion × process × security score,
+tokens, time, tool calls, and error-conditioned recovery are reported
+separately; process scoring uses the same university model and is therefore
+diagnostic rather than independent.
 
 See `analysis/metrics.py` and `docs/experiment.md`.
 

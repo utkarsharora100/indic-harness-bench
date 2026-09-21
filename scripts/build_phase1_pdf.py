@@ -343,6 +343,8 @@ def _build_story(root: Path, data: dict[str, Any], figure_paths: dict[str, Path]
     rows = data["rows"]
     story: list[Any] = []
     story.append(_p("Phase I: Controlled English, Hindi, and Hinglish Benchmark", styles["title"]))
+    if report.get("experiment_id") == "phase1_language_comparison":
+        story.append(_p("SUPERSEDED FOR INFERENCE — use the corrected language × harness study instead. This historical report is retained for audit only.", styles["subtitle"]))
     story.append(_p("Research findings report | Provisional pending translation review | Generated from the completed 216-cell study", styles["subtitle"]))
 
     kpi_data = [

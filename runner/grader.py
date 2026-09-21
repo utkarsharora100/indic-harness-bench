@@ -21,6 +21,10 @@ class GradeResult:
     stdout: str
     stderr: str
     elapsed_seconds: float
+    outcome_score: float | None = None
+    details: dict[str, Any] | None = None
+    infrastructure_error: bool = False
+    error_type: str | None = None
 
 
 def run_grader(
@@ -40,6 +44,7 @@ def run_grader(
             stdout=str(result.get("stdout", "")),
             stderr=str(result.get("stderr", "")),
             elapsed_seconds=monotonic() - started,
+            details=dict(result),
         )
 
     process = subprocess.run(
@@ -57,6 +62,11 @@ def run_grader(
         stdout=process.stdout,
         stderr=process.stderr,
         elapsed_seconds=monotonic() - started,
+        details={
+            "returncode": process.returncode,
+            "stdout": process.stdout,
+            "stderr": process.stderr,
+        },
     )
 
 
@@ -76,7 +86,23 @@ def run_upstream_oracle(
         result = oracle_runner(task_dir, oracle_module, timeout_seconds)
     score = result.get("outcome_score", 0.0)
     try:
-        success = float(score) >= expected_outcome_score
+        numeric_score = float(score)
+    except (TypeError, ValueError):
+        numeric_score = None
+    # The isolated oracle wrapper serializes exceptions as JSON so that the
+    # failure remains inspectable.  It is not a model outcome and must block
+    # a cell from being called gradable.
+    oracle_error = (
+        bool(result.get("error"))
+        or numeric_score is None
+        or not 0.0 <= numeric_score <= 1.0
+    )
+    if oracle_error:
+        raise GraderInfrastructureError(
+            f"Oracle did not produce a trustworthy score: {result.get('error', 'invalid outcome_score')}"
+        )
+    try:
+        success = numeric_score >= expected_outcome_score
     except (TypeError, ValueError):
         success = False
     payload = json.dumps(result, ensure_ascii=False)
@@ -86,4 +112,6 @@ def run_upstream_oracle(
         stdout=payload,
         stderr=str(result.get("error", "")),
         elapsed_seconds=monotonic() - started,
+        outcome_score=numeric_score,
+        details=result,
     )

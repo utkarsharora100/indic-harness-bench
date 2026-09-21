@@ -7,16 +7,23 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from time import monotonic
+from types import SimpleNamespace
 from typing import Any
 
 from agents.base import AgentRequest, AgentResponse
 from agents.factory import build_agent
 from benchmark.models import Language, TaskDefinition
-from benchmark.upstream import render_instruction
+from benchmark.upstream import (
+    after_round_runtime,
+    cleanup_runtime,
+    prepare_runtime,
+    render_runtime_template,
+)
 from runner.config import ExperimentConfig
 from runner.grader import GradeResult, GraderInfrastructureError, run_grader, run_upstream_oracle
 from runner.inference import InferenceTransientError, public_model_config
 from runner.log import RunStore
+from runner.proxy import InferenceProxy
 from runner.redaction import redact
 from runner.sandbox import SandboxInfrastructureError, WorkspaceSandbox
 
@@ -91,6 +98,27 @@ class ExperimentRunner:
         self.config = config
         self.agents = agents
         self.models = models
+        self.proxies: dict[str, InferenceProxy] = {}
+        proxy_config = config.inference.get("proxy") or {}
+        if proxy_config.get("enabled"):
+            for model_name, model_config in list(self.models.items()):
+                if model_config.get("provider") != "university_gpu":
+                    continue
+                if not model_config.get("base_url") or not model_config.get("api_key"):
+                    raise ValueError(f"Model {model_name} cannot use the proxy without private endpoint settings")
+                proxy = InferenceProxy(
+                    str(model_config["base_url"]),
+                    str(model_config["api_key"]),
+                    str(model_config["model"]),
+                ).start()
+                self.proxies[model_name] = proxy
+                public = dict(model_config)
+                public["base_url"] = proxy.base_url
+                public["container_base_url"] = proxy.container_base_url
+                public["api_key"] = proxy.client_key
+                public["model"] = str(proxy_config.get("public_model", "phase1-university-model"))
+                public["proxy"] = True
+                self.models[model_name] = public
         database = config.root / config.storage["database"]
         self.store = RunStore(database)
         (config.root / config.storage["traces_dir"]).mkdir(parents=True, exist_ok=True)
@@ -99,6 +127,8 @@ class ExperimentRunner:
     def close(self) -> None:
         self.store.commit()
         self.store.close()
+        for proxy in self.proxies.values():
+            proxy.close()
 
     def plan_cells(self, tasks: list[TaskDefinition]) -> list[Cell]:
         experiment = self.config.experiment
@@ -202,7 +232,7 @@ class ExperimentRunner:
             )
         self.store.commit()
 
-        random.Random(int(experiment.get("seed", 0))).shuffle(cells)
+        cells = self._execution_order(cells, int(experiment.get("seed", 0)))
         results: list[dict[str, Any]] = []
         processed = 0
         for cell in cells:
@@ -215,6 +245,24 @@ class ExperimentRunner:
             results.append(self._run_cell(cell))
             processed += 1
         return results
+
+    @staticmethod
+    def _execution_order(cells: list[Cell], seed: int) -> list[Cell]:
+        """Shuffle condition order within task/repetition blocks.
+
+        This controls endpoint drift without treating temperature-zero repeats
+        as independent stochastic observations. The resulting order is fully
+        determined by the experiment seed and stable cell identities.
+        """
+        by_block: dict[tuple[str, int], list[Cell]] = {}
+        for cell in cells:
+            by_block.setdefault((cell.task.task_id, cell.repetition), []).append(cell)
+        ordered: list[Cell] = []
+        for block_index, key in enumerate(sorted(by_block)):
+            block = list(by_block[key])
+            random.Random(seed + block_index).shuffle(block)
+            ordered.extend(block)
+        return ordered
 
     def completion_summary(self, tasks: list[TaskDefinition]) -> dict[str, int]:
         expected = len(self.plan_cells(tasks))
@@ -317,18 +365,23 @@ class ExperimentRunner:
         elapsed = monotonic() - overall_started
         success = bool(final_grade and final_grade.success)
         if final_status == "completed":
+            grade_payload = {
+                "returncode": final_grade.returncode if final_grade else None,
+                "success": bool(final_grade and final_grade.success),
+                "outcome_score": final_grade.outcome_score if final_grade else None,
+                "stdout": final_grade.stdout if final_grade else "",
+                "stderr": final_grade.stderr if final_grade else "",
+                "details": final_grade.details if final_grade else None,
+                "infrastructure_error": bool(final_grade and final_grade.infrastructure_error),
+                "error_type": final_grade.error_type if final_grade else None,
+            }
             self.store.add_grade(
                 cell.cell_id,
                 "task_grader",
                 success,
-                json.dumps(
-                    {
-                        "returncode": final_grade.returncode if final_grade else None,
-                        "stdout": (final_grade.stdout if final_grade else "")[-12000:],
-                        "stderr": (final_grade.stderr if final_grade else "")[-12000:],
-                    },
-                    ensure_ascii=False,
-                ),
+                json.dumps(grade_payload, ensure_ascii=False),
+                score=final_grade.outcome_score if final_grade else None,
+                status="completed" if final_grade and not final_grade.infrastructure_error else "invalid",
             )
         usage = final_response.usage if final_response else {}
         metadata = final_response.metadata if final_response else {}
@@ -336,7 +389,7 @@ class ExperimentRunner:
             cell.cell_id,
             end_time=utc_now(),
             status=final_status,
-            success=success if final_status == "completed" else False,
+            success=success if final_status == "completed" else None,
             input_tokens=usage.get("input_tokens"),
             output_tokens=usage.get("output_tokens"),
             total_tokens=usage.get("total_tokens"),
@@ -358,6 +411,12 @@ class ExperimentRunner:
                 "error": redact(str(final_error), self._redaction_secrets(model_config))
                 if final_error
                 else None,
+                "outcome_score": final_grade.outcome_score if final_grade else None,
+                "grade_status": (
+                    "completed"
+                    if final_grade and not final_grade.infrastructure_error
+                    else "missing"
+                ),
             },
         )
         self._append_trace(cell.cell_id, trace)
@@ -416,6 +475,29 @@ class ExperimentRunner:
             fixtures=fixtures,
             network=self.config.sandbox.get("network", "none"),
         ) as sandbox:
+            runtime_state: dict[str, Any] = {}
+            runtime_env: dict[str, str] = {}
+            if task.upstream is not None:
+                source_task_dir = task_root / task.upstream.source_dir
+                runtime_state = prepare_runtime(
+                    source_task_dir,
+                    sandbox.root or sandbox.workspace.parent,
+                    sandbox.workspace,
+                    task.upstream.hooks_module,
+                )
+                runtime_env = {
+                    key: str(value)
+                    for key, value in runtime_state.items()
+                    if isinstance(value, (str, int, float))
+                }
+                trace.append(
+                    self._event(
+                        cell.cell_id,
+                        0,
+                        "runtime_prepared",
+                        {"keys": sorted(runtime_env), "hook": task.upstream.hooks_module},
+                    )
+                )
             agent = build_agent(
                 cell.agent,
                 self.agents[cell.agent],
@@ -424,7 +506,11 @@ class ExperimentRunner:
             )
             workspace_for_prompt = "/workspace" if self.config.sandbox["mode"] == "docker" else sandbox.workspace
             request = AgentRequest(
-                instruction=render_instruction(task.instruction_for(cell.language), workspace_for_prompt),
+                instruction=render_runtime_template(
+                    task.instruction_for(cell.language),
+                    workspace=workspace_for_prompt,
+                    runtime_env=runtime_env,
+                ),
                 workspace=str(sandbox.workspace),
                 system_prompt=SYSTEM_PROMPT,
                 model=model_config["model"],
@@ -436,69 +522,130 @@ class ExperimentRunner:
                 command_timeout_seconds=task.limits.timeout_seconds,
             )
             agent_started = monotonic()
+            proxy = self.proxies.get(cell.model) if cell.agent != "react" else None
+            if proxy is not None:
+                proxy.begin_cell(cell.cell_id)
             try:
-                response = agent.run(request)
-            finally:
-                agent.close()
-            agent_time = monotonic() - agent_started
-            for event in response.metadata.get("events", []):
-                event_type = event.get("event_type", "agent_event")
-                event_payload = redact(
-                    {key: value for key, value in event.items() if key != "event_type"}, secrets
-                )
-                trace_event = self._event(cell.cell_id, int(event.get("step", 0)), event_type, event_payload)
-                trace.append(trace_event)
-                self.store.add_event(
-                    run_id=cell.cell_id,
-                    attempt_id=attempt_id,
-                    step=trace_event["step"],
-                    event_type=event_type,
-                    timestamp=trace_event["timestamp"],
-                    tool=event.get("tool"),
-                    arguments=redact(event.get("arguments"), secrets),
-                    result=redact(event.get("result"), secrets),
-                )
-            trace.append(
-                self._event(
-                    cell.cell_id,
-                    0,
-                    "agent_result",
-                    {
-                        "attempt_id": attempt_id,
-                        "completed": response.completed,
-                        "usage": response.usage,
-                        "metadata": {
-                            key: value
-                            for key, value in response.metadata.items()
-                            if key != "events"
+                try:
+                    response = agent.run(request)
+                finally:
+                    agent.close()
+                agent_time = monotonic() - agent_started
+                for event in response.metadata.get("events", []):
+                    event_type = event.get("event_type", "agent_event")
+                    event_payload = redact(
+                        {key: value for key, value in event.items() if key != "event_type"}, secrets
+                    )
+                    trace_event = self._event(
+                        cell.cell_id, int(event.get("step", 0)), event_type, event_payload
+                    )
+                    trace.append(trace_event)
+                    self.store.add_event(
+                        run_id=cell.cell_id,
+                        attempt_id=attempt_id,
+                        step=trace_event["step"],
+                        event_type=event_type,
+                        timestamp=trace_event["timestamp"],
+                        tool=event.get("tool"),
+                        arguments=redact(event.get("arguments"), secrets),
+                        result=redact(event.get("result"), secrets),
+                    )
+                trace.append(
+                    self._event(
+                        cell.cell_id,
+                        0,
+                        "agent_result",
+                        {
+                            "attempt_id": attempt_id,
+                            "completed": response.completed,
+                            "usage": response.usage,
+                            "metadata": {
+                                key: value
+                                for key, value in response.metadata.items()
+                                if key != "events"
+                            },
                         },
-                    },
+                    )
                 )
-            )
-            final_workspace_hash = workspace_sha256(sandbox.workspace)
-            if task.upstream is not None:
-                grade = run_upstream_oracle(
-                    task_root / task.upstream.source_dir,
-                    task.upstream.oracle_module,
-                    sandbox.workspace,
-                    task.upstream.expected_outcome_score,
-                    oracle_runner=sandbox.run_oracle if self.config.sandbox["mode"] == "docker" else None,
-                    timeout_seconds=task.limits.timeout_seconds,
-                )
-            else:
-                assert task.judge is not None
-                command_runner = (
-                    sandbox.run_grader_command if self.config.sandbox["mode"] == "docker" else None
-                )
-                grade = run_grader(
-                    sandbox.workspace,
-                    task.judge.command,
-                    task.judge.workdir,
-                    task.judge.expected_exit_code,
-                    task.limits.timeout_seconds,
-                    command_runner=command_runner,
-                )
-            return response, grade, trace, final_workspace_hash, agent_time
+                if task.upstream is not None:
+                    runtime_state = after_round_runtime(
+                        task_root / task.upstream.source_dir,
+                        sandbox.root or sandbox.workspace.parent,
+                        sandbox.workspace,
+                        task.upstream.hooks_module,
+                        runtime_state,
+                        SimpleNamespace(
+                            ok=response.completed,
+                            completed=response.completed,
+                            text=response.text,
+                            metadata=response.metadata,
+                        ),
+                    )
+                    trace.append(
+                        self._event(
+                            cell.cell_id,
+                            0,
+                            "runtime_after_round",
+                            {"keys": sorted(runtime_state)},
+                        )
+                    )
+                final_workspace_hash = workspace_sha256(sandbox.workspace)
+                if task.upstream is not None:
+                    grade = run_upstream_oracle(
+                        task_root / task.upstream.source_dir,
+                        task.upstream.oracle_module,
+                        sandbox.workspace,
+                        task.upstream.expected_outcome_score,
+                        oracle_runner=sandbox.run_oracle
+                        if self.config.sandbox["mode"] == "docker"
+                        else None,
+                        timeout_seconds=task.limits.timeout_seconds,
+                    )
+                else:
+                    assert task.judge is not None
+                    command_runner = (
+                        sandbox.run_grader_command
+                        if self.config.sandbox["mode"] == "docker"
+                        else None
+                    )
+                    grade = run_grader(
+                        sandbox.workspace,
+                        task.judge.command,
+                        task.judge.workdir,
+                        task.judge.expected_exit_code,
+                        task.limits.timeout_seconds,
+                        command_runner=command_runner,
+                    )
+                return response, grade, trace, final_workspace_hash, agent_time
+            finally:
+                if proxy is not None:
+                    for proxy_event in proxy.end_cell():
+                        trace_event = self._event(
+                            cell.cell_id,
+                            0,
+                            proxy_event["event_type"],
+                            proxy_event.get("data", {}),
+                        )
+                        trace_event["timestamp"] = proxy_event.get(
+                            "timestamp", trace_event["timestamp"]
+                        )
+                        trace.append(trace_event)
+                        self.store.add_event(
+                            run_id=cell.cell_id,
+                            attempt_id=attempt_id,
+                            step=0,
+                            event_type=proxy_event["event_type"],
+                            timestamp=trace_event["timestamp"],
+                            result=proxy_event.get("data", {}),
+                        )
+                if task.upstream is not None:
+                    cleanup_runtime(
+                        task_root / task.upstream.source_dir,
+                        sandbox.root or sandbox.workspace.parent,
+                        sandbox.workspace,
+                        task.upstream.hooks_module,
+                        runtime_state,
+                    )
 
     def _dataset_revision(self) -> str:
         manifest_path = self.config.root / self.config.experiment.get(

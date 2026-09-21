@@ -51,6 +51,14 @@ class ExperimentConfig:
         return str(self.experiment.get("id", self.experiment.get("name", self.path.stem)))
 
     @property
+    def agents_manifest(self) -> Path:
+        return (self.root / self.experiment.get("agents_manifest", "configs/agents.yaml")).resolve()
+
+    @property
+    def models_manifest(self) -> Path:
+        return (self.root / self.experiment.get("models_manifest", "configs/models.yaml")).resolve()
+
+    @property
     def configured_task_ids(self) -> list[str]:
         values = self.experiment.get("tasks", [])
         if not isinstance(values, list) or not values:

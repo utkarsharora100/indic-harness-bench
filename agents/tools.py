@@ -107,7 +107,16 @@ class WorkspaceTools:
         return handler(**arguments)
 
     def _resolve(self, relative_path: str) -> Path:
-        path = (self.workspace / relative_path).resolve()
+        # Harness-Bench prompts conventionally expose the mounted workspace as
+        # /workspace.  ReAct receives that same path even though the actual
+        # file tools operate on the host-mounted directory, so normalize both
+        # spellings before applying the escape check.
+        raw = str(relative_path)
+        if raw == "/workspace":
+            raw = "."
+        elif raw.startswith("/workspace/"):
+            raw = raw[len("/workspace/") :]
+        path = (self.workspace / raw).resolve()
         if path != self.workspace and self.workspace not in path.parents:
             raise ValueError(f"Path is outside workspace: {relative_path}")
         return path

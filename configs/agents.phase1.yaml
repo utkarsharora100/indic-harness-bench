@@ -1,0 +1,20 @@
+agents:
+  react:
+    type: react
+
+  # These images are intentionally explicit.  The preflight gate must fail if
+  # a pinned native runtime is not installed; it must never silently fall back
+  # to the old host-process wrappers.
+  nanobot:
+    type: native
+    image: indic-harness-nanobot:phase1-pinned
+    image_digest: ""
+    command: ["nanobot", "agent", "--message", "{prompt}", "--workspace", "{workspace}"]
+    network: phase1-agent-net
+
+  openclaw:
+    type: native
+    image: indic-harness-openclaw:phase1-pinned
+    image_digest: ""
+    command: ["openclaw", "agent", "--local", "--message", "{prompt}", "--workspace", "{workspace}"]
+    network: phase1-agent-net

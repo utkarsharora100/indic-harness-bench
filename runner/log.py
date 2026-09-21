@@ -36,7 +36,10 @@ CREATE TABLE IF NOT EXISTS run (
     seed INTEGER NOT NULL,
     start_time TEXT NOT NULL,
     end_time TEXT,
-    success INTEGER NOT NULL DEFAULT 0,
+    -- NULL means that success is unknown because the cell ended as an
+    -- infrastructure error. Model/task failure is represented by 0 only for
+    -- completed, gradable cells.
+    success INTEGER DEFAULT 0,
     input_tokens INTEGER,
     output_tokens INTEGER,
     total_tokens INTEGER,
@@ -83,8 +86,25 @@ CREATE TABLE IF NOT EXISTS grade (
     run_id TEXT NOT NULL,
     test_name TEXT NOT NULL,
     passed INTEGER NOT NULL,
+    score REAL,
+    kind TEXT NOT NULL DEFAULT 'task',
+    status TEXT NOT NULL DEFAULT 'completed',
     details TEXT,
     PRIMARY KEY (run_id, test_name)
+);
+CREATE TABLE IF NOT EXISTS process_grade (
+    run_id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    judge_model TEXT,
+    rubric_sha256 TEXT,
+    input_sha256 TEXT,
+    tool_use_appropriate REAL,
+    consistency REAL,
+    robustness REAL,
+    security_score REAL,
+    process_score REAL,
+    combined_score REAL,
+    details TEXT
 );
 CREATE TABLE IF NOT EXISTS failure (
     run_id TEXT NOT NULL,
@@ -125,6 +145,11 @@ class RunStore:
                 "status": "TEXT NOT NULL DEFAULT 'legacy'",
             },
             "event": {"attempt_id": "TEXT"},
+            "grade": {
+                "score": "REAL",
+                "kind": "TEXT NOT NULL DEFAULT 'task'",
+                "status": "TEXT NOT NULL DEFAULT 'completed'",
+            },
         }
         for table, columns in additions.items():
             existing = {
@@ -135,7 +160,60 @@ class RunStore:
                     self.connection.execute(
                         f"ALTER TABLE {table} ADD COLUMN {column} {declaration}"
                     )
+        self._make_success_nullable()
         self.connection.commit()
+
+    def _make_success_nullable(self) -> None:
+        """Migrate prototype databases so infrastructure outcomes stay unknown."""
+        columns = self.connection.execute("PRAGMA table_info(run)").fetchall()
+        success = next((row for row in columns if row[1] == "success"), None)
+        if success is None or int(success[3]) == 0:
+            return
+        names = [row[1] for row in columns]
+        self.connection.execute("ALTER TABLE run RENAME TO run_nonnull_legacy")
+        self.connection.execute(
+            """CREATE TABLE run (
+                run_id TEXT PRIMARY KEY,
+                task_id TEXT NOT NULL,
+                language TEXT NOT NULL,
+                model TEXT NOT NULL,
+                agent TEXT NOT NULL,
+                seed INTEGER NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT,
+                success INTEGER DEFAULT 0,
+                input_tokens INTEGER,
+                output_tokens INTEGER,
+                total_tokens INTEGER,
+                initial_prompt_tokens INTEGER,
+                tool_calls INTEGER NOT NULL DEFAULT 0,
+                failed_tool_calls INTEGER NOT NULL DEFAULT 0,
+                execution_time REAL,
+                agent_time REAL,
+                end_to_end_time REAL,
+                workspace_sha256 TEXT,
+                trace_path TEXT,
+                model_metadata_json TEXT,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                experiment_id TEXT,
+                cell_id TEXT,
+                repetition INTEGER,
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'legacy'
+            )"""
+        )
+        current = [
+            "run_id", "task_id", "language", "model", "agent", "seed", "start_time",
+            "end_time", "success", "input_tokens", "output_tokens", "total_tokens",
+            "initial_prompt_tokens", "tool_calls", "failed_tool_calls", "execution_time",
+            "agent_time", "end_to_end_time", "workspace_sha256", "trace_path",
+            "model_metadata_json", "metadata_json", "experiment_id", "cell_id",
+            "repetition", "attempt_count", "status",
+        ]
+        preserved = [name for name in current if name in names]
+        fields = ", ".join(preserved)
+        self.connection.execute(f"INSERT INTO run({fields}) SELECT {fields} FROM run_nonnull_legacy")
+        self.connection.execute("DROP TABLE run_nonnull_legacy")
 
     def close(self) -> None:
         self.connection.close()
@@ -316,11 +394,45 @@ class RunStore:
             ),
         )
 
-    def add_grade(self, run_id: str, test_name: str, passed: bool, details: str) -> None:
+    def add_grade(
+        self,
+        run_id: str,
+        test_name: str,
+        passed: bool,
+        details: str,
+        *,
+        score: float | None = None,
+        kind: str = "task",
+        status: str = "completed",
+    ) -> None:
         self.connection.execute(
-            """INSERT OR REPLACE INTO grade(run_id, test_name, passed, details)
-               VALUES (?, ?, ?, ?)""",
-            (run_id, test_name, int(passed), details),
+            """INSERT OR REPLACE INTO grade(
+                   run_id, test_name, passed, score, kind, status, details
+               ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (run_id, test_name, int(passed), score, kind, status, details),
+        )
+
+    def add_process_grade(self, run_id: str, values: dict[str, Any]) -> None:
+        self.connection.execute(
+            """INSERT OR REPLACE INTO process_grade(
+                run_id, status, judge_model, rubric_sha256, input_sha256,
+                tool_use_appropriate, consistency, robustness, security_score,
+                process_score, combined_score, details
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                run_id,
+                values.get("status", "missing"),
+                values.get("judge_model"),
+                values.get("rubric_sha256"),
+                values.get("input_sha256"),
+                values.get("tool_use_appropriate"),
+                values.get("consistency"),
+                values.get("robustness"),
+                values.get("security_score"),
+                values.get("process_score"),
+                values.get("combined_score"),
+                json.dumps(values, ensure_ascii=False, sort_keys=True),
+            ),
         )
 
     # Compatibility methods for the original prototype and old pilot data.

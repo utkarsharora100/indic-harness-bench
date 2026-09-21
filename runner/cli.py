@@ -8,7 +8,9 @@ from rich.console import Console
 from rich.table import Table
 
 from analysis.report import build_phase1_report
+from analysis.corrected_report import build_corrected_report
 from benchmark.loader import discover_tasks, select_tasks
+from runner.judge import judge_database
 from runner.config import ExperimentConfig
 from runner.inference import ensure_model_manifest
 from runner.runner import ExperimentRunner
@@ -24,8 +26,8 @@ def load_yaml(path: Path) -> dict:
 
 def load_runtime(config: ExperimentConfig) -> tuple[dict, dict, dict | None]:
     root = config.root
-    agents = load_yaml(root / "configs/agents.yaml")["agents"]
-    models = load_yaml(root / "configs/models.yaml")["models"]
+    agents = load_yaml(config.agents_manifest)["agents"]
+    models = load_yaml(config.models_manifest)["models"]
     model_manifest = None
     for model_name in config.experiment.get("models", []):
         model_config = models.get(model_name, {})
@@ -82,6 +84,46 @@ def report(
 ) -> None:
     build_phase1_report(database, output)
     console.print(f"Wrote {output}")
+
+
+@app.command("corrected-report")
+def corrected_report(
+    config: Path = typer.Option(Path("configs/phase1.corrected.research.yaml"), exists=True),
+    database: Path | None = typer.Option(None),
+    output: Path = typer.Option(Path("data/phase1/corrected/provisional_report.md")),
+    experiment_id: str | None = typer.Option(None),
+) -> None:
+    experiment_config = ExperimentConfig.load(config)
+    db = database or (experiment_config.root / experiment_config.storage["database"])
+    result = build_corrected_report(db, output, experiment_id or experiment_config.experiment_id)
+    console.print(
+        f"Wrote {output}; {result['cells']['completed_rows']} completed cells, "
+        f"{result['cells']['oracle_gradable']} oracle-gradable."
+    )
+
+
+@app.command("judge")
+def judge(
+    config: Path = typer.Option(Path("configs/phase1.corrected.research.yaml"), exists=True),
+    database: Path | None = typer.Option(None),
+    experiment_id: str | None = typer.Option(None),
+) -> None:
+    """Run the frozen paper-style process rubric after agent execution."""
+    experiment_config = ExperimentConfig.load(config)
+    agents, models, _ = load_runtime(experiment_config)
+    runner = ExperimentRunner(experiment_config, agents, models)
+    try:
+        model_name = str(experiment_config.experiment["models"][0])
+        result = judge_database(
+            experiment_config.root / (database or experiment_config.storage["database"]),
+            experiment_config.task_root,
+            runner.models[model_name],
+            experiment_id=experiment_id or experiment_config.experiment_id,
+            max_tokens=int(experiment_config.generation.get("max_tokens", 2048)),
+        )
+    finally:
+        runner.close()
+    console.print(result)
 
 
 if __name__ == "__main__":
