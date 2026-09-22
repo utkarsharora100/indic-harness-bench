@@ -65,17 +65,79 @@ def _load_task_rubric(task_source: Path) -> tuple[str, str, str]:
     return RUBRIC_SYSTEM, RUBRIC_TEMPLATE, "runner.judge.default"
 
 
+def _compact_value(value: Any, *, limit: int = 1200, depth: int = 0) -> Any:
+    """Keep judge evidence bounded without changing the raw trace on disk."""
+    if isinstance(value, str):
+        if len(value) <= limit:
+            return value
+        return value[:limit] + f"...[truncated {len(value) - limit} chars]"
+    if depth >= 3:
+        return f"<{type(value).__name__}>"
+    if isinstance(value, list):
+        return [_compact_value(item, limit=limit, depth=depth + 1) for item in value[:80]]
+    if isinstance(value, dict):
+        return {
+            str(key): _compact_value(item, limit=limit, depth=depth + 1)
+            for key, item in list(value.items())[:80]
+        }
+    return value
+
+
+def _compact_agent_result(data: dict[str, Any]) -> dict[str, Any]:
+    """Remove native CLI transcript text while retaining observable outcomes."""
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    allowed = {
+        "returncode",
+        "elapsed_seconds",
+        "timed_out",
+        "timeout_error",
+        "state_isolated",
+        "workspace_mount",
+        "native_tool_calls",
+        "native_failed_tool_calls",
+        "native_tool_summary",
+        "proxy_calls",
+        "tool_calls",
+        "failed_tool_calls",
+        "stop_reason",
+        "model_calls",
+    }
+    compact_metadata = {key: metadata[key] for key in allowed if key in metadata}
+    return {
+        "attempt_id": data.get("attempt_id"),
+        "completed": data.get("completed"),
+        "usage": _compact_value(data.get("usage", {})),
+        "metadata": _compact_value(compact_metadata),
+    }
+
+
 def normalize_trace(trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Remove condition identifiers while retaining externally observable evidence."""
+    """Remove labels and redundant raw model transcripts for process judging.
+
+    The raw JSONL trace remains unchanged.  Proxy requests repeat the entire
+    growing conversation and native agent results contain a verbose CLI JSON
+    transcript; sending either verbatim can exceed the university model's
+    context window.  Tool names/counts, failures, usage, stop reasons, and
+    task-visible tool events are retained in a deterministic compact form.
+    """
     normalized: list[dict[str, Any]] = []
     for event in trace:
+        event_type = event.get("event_type")
+        if event_type in {"proxy_request", "proxy_response"}:
+            continue
         item = {key: value for key, value in event.items() if key not in {"run_id", "timestamp"}}
         data = item.get("data")
         if isinstance(data, dict):
             data = dict(data)
             for key in ("language", "agent", "model", "repetition", "attempt_id"):
                 data.pop(key, None)
+            if event_type == "agent_result":
+                data = _compact_agent_result(data)
+            else:
+                data = _compact_value(data)
             item["data"] = data
+        else:
+            item = _compact_value(item)
         normalized.append(item)
     return normalized
 
@@ -193,6 +255,8 @@ def judge_database(
     *,
     experiment_id: str | None = None,
     max_tokens: int = 2048,
+    proxy: Any | None = None,
+    rerun: bool = False,
 ) -> dict[str, int]:
     store = RunStore(database)
     judge = ProcessJudge(model_config, max_tokens=max_tokens)
@@ -205,7 +269,7 @@ def judge_database(
             existing = store.connection.execute(
                 "SELECT status FROM process_grade WHERE run_id = ?", (row["run_id"],)
             ).fetchone()
-            if existing is not None and existing[0] == "completed":
+            if not rerun and existing is not None and existing[0] == "completed":
                 counts["completed"] += 1
                 continue
             trace_path = Path(row.get("trace_path") or "")
@@ -218,11 +282,13 @@ def judge_database(
             prompt_path = task_source / "prompt.txt"
             prompt = prompt_path.read_text(encoding="utf-8") if prompt_path.is_file() else ""
             grade_row = store.connection.execute(
-                "SELECT score, details FROM grade WHERE run_id = ? AND kind = 'task' LIMIT 1",
+                "SELECT score, details FROM grade WHERE run_id = ? AND test_name = 'task_grader' LIMIT 1",
                 (row["run_id"],),
             ).fetchone()
             outcome = float(grade_row[0]) if grade_row and grade_row[0] is not None else None
             try:
+                if proxy is not None:
+                    proxy.begin_cell(f"judge:{row['run_id']}")
                 result = judge.score(
                     task_id=row["task_id"],
                     task_source=task_source,
@@ -236,6 +302,9 @@ def judge_database(
                     "judge_model": model_config.get("model"),
                     "error": f"{type(exc).__name__}: {exc}",
                 }
+            finally:
+                if proxy is not None:
+                    proxy.end_cell()
             store.add_process_grade(row["run_id"], result)
             counts[result.get("status", "invalid")] = counts.get(result.get("status", "invalid"), 0) + 1
             store.commit()

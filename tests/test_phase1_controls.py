@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from agents.base import AgentRequest
+from agents.external import _parse_openclaw_json
 from agents.react import ReactAgent
 from agents.tools import WorkspaceTools
 from analysis.metrics import paired_outcome
@@ -10,6 +11,7 @@ from benchmark.upstream import after_round_runtime, prepare_runtime, render_runt
 from runner.redaction import redact
 from runner.runner import stable_cell_id
 from runner.log import RunStore
+from runner.judge import normalize_trace
 
 
 class _MalformedCompletions:
@@ -78,6 +80,16 @@ def test_stable_cell_id_and_secret_redaction():
     }
 
 
+def test_openclaw_json_parser_handles_prefixed_pretty_output():
+    raw = (
+        "diagnostic line\n"
+        '{\n  "completion": {"stopReason": "stop"},\n'
+        '  "toolSummary": {"calls": 3, "failures": 0, "tools": ["read"]}\n}\n'
+    )
+    parsed = _parse_openclaw_json(raw)
+    assert parsed["toolSummary"]["calls"] == 3
+
+
 def test_paired_report_calculations():
     rows = [
         {"task_id": "a", "repetition": 0, "language": "english", "success": 1},
@@ -96,6 +108,33 @@ def test_no_json_trace_like_secret_is_required_for_redaction():
     assert json.dumps(redact(payload, ("sk-private", "http://private"))) == (
         '{"api_key": "[REDACTED]", "nested": {"url": "[REDACTED]"}}'
     )
+
+
+def test_judge_trace_compaction_removes_redundant_transcripts():
+    trace = [
+        {"event_type": "proxy_request", "data": {"messages": ["x" * 10000]}},
+        {"event_type": "proxy_response", "data": {"choices": ["y" * 10000]}},
+        {
+            "event_type": "agent_result",
+            "data": {
+                "attempt_id": "private-condition-id",
+                "completed": True,
+                "metadata": {
+                    "native_harness_output": "z" * 100000,
+                    "native_tool_calls": 3,
+                    "native_failed_tool_calls": 1,
+                    "native_tool_summary": {"tools": ["read", "write"]},
+                },
+            },
+        },
+    ]
+
+    compact = normalize_trace(trace)
+    assert [event["event_type"] for event in compact] == ["agent_result"]
+    rendered = json.dumps(compact, ensure_ascii=False)
+    assert "native_harness_output" not in rendered
+    assert "private-condition-id" not in rendered
+    assert len(rendered) < 1000
 
 
 def test_workspace_mount_path_is_equivalent_to_relative_path(tmp_path: Path):

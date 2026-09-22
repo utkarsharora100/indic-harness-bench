@@ -53,11 +53,15 @@ inference:
   env_file: .env.uni-gpu.local
   requested_model_env: INDIC_UNI_GPU_MODEL
   manifest: data/phase1/corrected/model-manifest.json
+  runtime_manifest: data/phase1/corrected/runtime-manifest.json
   timeout_seconds: 90
   max_retries: 2
   proxy:
     enabled: true
     public_model: phase1-university-model
+    max_calls_per_cell: 40
+    image: indic-harness-proxy:phase1-pinned
+    egress_network: bridge
 
 storage:
   experiment_dir: data/phase1/corrected

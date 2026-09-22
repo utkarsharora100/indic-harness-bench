@@ -136,11 +136,16 @@ class ReactAgent:
             message = completion.choices[0].message
             response_text = message.content or ""
             message_tool_calls = message.tool_calls or []
+            finish_reason = getattr(completion.choices[0], "finish_reason", None)
 
             if not message_tool_calls:
                 events.append(model_event)
                 return AgentResponse(
-                    completed=True,
+                    # A response cut off at the per-call generation budget is
+                    # a valid, gradable model stop.  Do not resend the same
+                    # growing history and turn it into an opaque upstream
+                    # context-window failure.
+                    completed=finish_reason != "length",
                     text=response_text,
                     usage={
                         "input_tokens": input_tokens,
@@ -157,6 +162,7 @@ class ReactAgent:
                         "failed_tool_calls": failed_tool_calls,
                         "model_calls": model_calls,
                         "initial_prompt_tokens": initial_prompt_tokens,
+                        "stop_reason": "max_tokens" if finish_reason == "length" else None,
                         "events": events,
                     },
                 )
@@ -224,6 +230,34 @@ class ReactAgent:
             # the model-call event still records per-call usage and finish
             # reason without collecting private reasoning text.
             events.append(model_event)
+
+            if finish_reason == "length":
+                # The final tool call is valid and has been executed above.
+                # Stop here rather than issuing a continuation that can push
+                # the accumulated tool transcript beyond the served model's
+                # context window.
+                return AgentResponse(
+                    completed=False,
+                    text=response_text,
+                    usage={
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "total_tokens": (
+                            input_tokens + output_tokens
+                            if input_tokens is not None and output_tokens is not None
+                            else None
+                        ),
+                    },
+                    metadata={
+                        "steps": step + 1,
+                        "stop_reason": "max_tokens",
+                        "tool_calls": tool_calls,
+                        "failed_tool_calls": failed_tool_calls,
+                        "model_calls": model_calls,
+                        "initial_prompt_tokens": initial_prompt_tokens,
+                        "events": events,
+                    },
+                )
 
         return AgentResponse(
             completed=False,

@@ -9,12 +9,14 @@ agents:
     type: native
     image: indic-harness-nanobot:phase1-pinned
     image_digest: ""
-    command: ["nanobot", "agent", "--message", "{prompt}", "--workspace", "{workspace}"]
+    release: "0.3.5"
+    command: ["nanobot", "agent", "--classic", "--no-markdown", "--no-logs", "--message", "{prompt}", "--session", "{session}", "--workspace", "{workspace}", "--config", "{config}"]
     network: phase1-agent-net
 
   openclaw:
     type: native
     image: indic-harness-openclaw:phase1-pinned
     image_digest: ""
-    command: ["openclaw", "agent", "--local", "--message", "{prompt}", "--workspace", "{workspace}"]
+    release: "2026.9.5"
+    command: ["openclaw", "agent", "--local", "--message-file", "{message_file}", "--model", "{model}", "--session-id", "{session}", "--thinking", "off", "--timeout", "{timeout}", "--json"]
     network: phase1-agent-net

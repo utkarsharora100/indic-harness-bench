@@ -1,6 +1,7 @@
-# Corrective 45-cell pilot: 5 tasks x 3 languages x 3 harnesses.
+# Corrective 45-cell pilot v12: the v11 ReAct truncation/continuation repair
+# is frozen as a new experiment.  v11 remains immutable and superseded.
 experiment:
-  name: phase1_corrected_pilot_v11
+  name: phase1_corrected_pilot_v12
   dataset_manifest: benchmark/task_selection.yaml
   prepared_tasks_root: data/phase1/tasks
   agents_manifest: configs/agents.phase1.yaml
@@ -16,7 +17,7 @@ experiment:
     - 019-incident-runbook-synthesis
   agents: [react, nanobot, openclaw]
   models: [university_gpu]
-  version: corrected-v11
+  version: corrected-v12
 
 generation:
   temperature: 0.0
@@ -33,7 +34,7 @@ inference:
   provider: university_gpu
   env_file: .env.uni-gpu.local
   requested_model_env: INDIC_UNI_GPU_MODEL
-  manifest: data/phase1/corrected/pilot-v11-model-manifest.json
+  manifest: data/phase1/corrected/pilot-v12-model-manifest.json
   runtime_manifest: data/phase1/corrected/runtime-manifest.json
   timeout_seconds: 90
   max_retries: 2
@@ -45,7 +46,7 @@ inference:
     egress_network: bridge
 
 storage:
-  experiment_dir: data/phase1/corrected/pilot-v11
-  database: data/phase1/corrected/pilot-v11/runs.sqlite
-  traces_dir: data/phase1/corrected/pilot-v11/traces
-  results_dir: data/phase1/corrected/pilot-v11/results
+  experiment_dir: data/phase1/corrected/pilot-v12
+  database: data/phase1/corrected/pilot-v12/runs.sqlite
+  traces_dir: data/phase1/corrected/pilot-v12/traces
+  results_dir: data/phase1/corrected/pilot-v12/results

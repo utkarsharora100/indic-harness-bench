@@ -206,7 +206,7 @@ try:
         raise RuntimeError('oracle returned a non-object result')
     print(json.dumps(result, ensure_ascii=False))
 except Exception as exc:
-    print(json.dumps({'outcome_score': 0.0, 'error': f'{type(exc).__name__}: {exc}',
+    print(json.dumps({'outcome_score': None, 'error': f'{type(exc).__name__}: {exc}',
                       'traceback': traceback.format_exc()}))
     sys.exit(2)
 """

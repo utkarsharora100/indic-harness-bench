@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -75,11 +76,23 @@ class ExternalAgentAdapter:
 
 
 def _parse_openclaw_json(stdout: str) -> dict[str, object]:
-    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
-    if not lines:
+    text = stdout.strip()
+    if not text:
         return {}
+    decoder = json.JSONDecoder()
+    # OpenClaw may prefix its JSON result with human-readable diagnostics and
+    # may pretty-print the result across many lines. Select the top-level
+    # object carrying the stable tool summary rather than parsing only the
+    # final `}` line.
+    for match in re.finditer(r"\{", text):
+        try:
+            data, _end = decoder.raw_decode(text[match.start() :])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and ("toolSummary" in data or "completion" in data):
+            return data
     try:
-        data = json.loads(lines[-1])
+        data = json.loads(text)
     except json.JSONDecodeError:
         return {"json_parse_error": True}
     return data if isinstance(data, dict) else {"json_parse_error": True}

@@ -22,6 +22,8 @@ from analysis.corrected import (
 
 def build_corrected_report(database: Path, output: Path, experiment_id: str) -> dict[str, Any]:
     rows = load_corrected_rows(database, experiment_id)
+    task_count = len({row["task_id"] for row in rows})
+    repetition_count = len({row.get("repetition") for row in rows}) or 1
     paper_style = task_balanced_metric(rows, "combined_score", "process_status")
     process_dimensions = {
         dimension: task_balanced_metric(rows, dimension, "process_status")
@@ -70,7 +72,7 @@ def build_corrected_report(database: Path, output: Path, experiment_id: str) -> 
         "schema_version": 2,
         "provisional": True,
         "experiment_id": experiment_id,
-        "study_design": "24 tasks x 3 languages x 3 harnesses x 3 repetitions",
+        "study_design": f"{task_count} tasks x 3 languages x 3 harnesses x {repetition_count} repetition(s)",
         "cells": {
             "database_rows": expected,
             "completed_rows": len(rows),
@@ -122,9 +124,20 @@ def build_corrected_report(database: Path, output: Path, experiment_id: str) -> 
     ]
     for key, value in sorted(report["task_balanced_outcome"].items()):
         lines.append(f"| {key} | {value:.4f} |")
+    lines.extend(["", "## Task-balanced process/security diagnostics", "", "| Harness/language | Tool use | Consistency | Robustness | Security | Process | Combined |", "|---|---:|---:|---:|---:|---:|---:|"])
+    condition_keys = sorted(report["task_balanced_outcome"])
+    dimensions = report["task_balanced_process_dimensions"]
+    for key in condition_keys:
+        values = [dimensions.get(dimension, {}).get(key) for dimension in ("tool_use_appropriate", "consistency", "robustness", "security_score", "process_score", "combined_score")]
+        rendered = ["—" if value is None else f"{value:.4f}" for value in values]
+        lines.append(f"| {key} | " + " | ".join(rendered) + " |")
     lines.extend(["", "## Paired Hindi/Hinglish deltas against English", "", "| Harness | Hindi − English | Hinglish − English |", "|---|---:|---:|"])
     for harness, values in sorted(report["paired_oracle_deltas"].items()):
         lines.append(f"| {harness} | {values.get('hindi', float('nan')):.4f} | {values.get('hinglish', float('nan')):.4f} |")
+    lines.extend(["", "## 95% task-cluster bootstrap intervals for paired oracle deltas", "", "| Harness/language contrast | Lower | Upper |", "|---|---:|---:|"])
+    for harness, values in sorted(report["paired_oracle_bootstrap_95"].items()):
+        for language, interval in sorted(values.items()):
+            lines.append(f"| {harness}: {language} − English | {interval['lower']:.4f} | {interval['upper']:.4f} |")
     lines.extend(["", "## Paired binary outcomes", ""])
     for harness, values in sorted(report["paired_binary_outcomes"].items()):
         lines.append(f"### {harness}\n")
@@ -135,12 +148,14 @@ def build_corrected_report(database: Path, output: Path, experiment_id: str) -> 
     for section, values in report["harness_interactions"].items():
         for key, value in sorted(values.items()):
             lines.append(f"| {section}: {key} | {value:.4f} |")
-    lines.extend(["", "## Data products", "", f"- Task-level score rows: {len(report['task_scores'])}", f"- Paired score differences: {len(report['score_difference_distribution'])}", f"- Trace links: {len(report['trace_links'])}"])
+    lines.extend(["", "## Data products", "", f"- Task-level score rows: {len(report['task_scores'])}", f"- Paired score differences: {len(report['score_difference_distribution'])}", f"- Trace links: {len(report['trace_links'])}", f"- Machine-readable report: `{output.with_suffix('.json')}`"])
     lines.extend([
         "## Interpretation constraints",
         "",
+        f"- This is the five-task, one-repetition pilot ({report['study_design']}); it is not the planned 648-cell main study.",
         "- Continuous oracle outcome is the primary language estimand; perfect completion is secondary.",
         "- The paper-style process/security aggregate is diagnostic because the agent model also judges it.",
+        "- The same university model was used for agent calls and process judging; process scores are not independent validation.",
         "- No causal failure attribution is made without trace annotation.",
     ])
     output.write_text("\n".join(lines) + "\n", encoding="utf-8")

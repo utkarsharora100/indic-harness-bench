@@ -72,8 +72,49 @@ def test_proxy_allowlist_and_observable_trace():
             assert response.status == 200
         events = proxy.end_cell()
         assert [event["event_type"] for event in events] == ["proxy_request", "proxy_response"]
-        assert events[0]["data"]["model"] == "served-model"
+        assert events[0]["data"]["model"] == "public-alias"
+        assert events[0]["data"]["temperature"] == 0.0
+        assert events[0]["data"]["top_p"] == 1.0
+        assert events[0]["data"]["max_tokens"] == 2048
+        assert urlopen(
+            Request(
+                f"{proxy.base_url}/models",
+                headers={"Authorization": f"Bearer {proxy.client_key}"},
+            )
+        ).read() == b'{"object": "list", "data": [{"id": "phase1-university-model", "object": "model"}]}'
         assert events[1]["data"]["choices"][0]["message"]["tool_calls"][0]["function"]["name"] == "add"
+    finally:
+        proxy.close()
+        upstream.shutdown()
+        upstream.server_close()
+        thread.join(timeout=2)
+
+
+def test_proxy_enforces_per_cell_call_limit():
+    upstream = ThreadingHTTPServer(("127.0.0.1", 0), _FakeUpstream)
+    thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    thread.start()
+    proxy = InferenceProxy(
+        f"http://127.0.0.1:{upstream.server_address[1]}",
+        "private-upstream-key",
+        "served-model",
+        max_calls_per_cell=1,
+    ).start()
+    try:
+        proxy.begin_cell("cell-limit")
+        body = json.dumps({"model": "phase1-university-model", "messages": []}).encode()
+        headers = {
+            "Authorization": f"Bearer {proxy.client_key}",
+            "Content-Type": "application/json",
+        }
+        with urlopen(Request(f"{proxy.base_url}/chat/completions", data=body, headers=headers, method="POST")):
+            pass
+        try:
+            urlopen(Request(f"{proxy.base_url}/chat/completions", data=body, headers=headers, method="POST"))
+        except Exception as exc:
+            assert getattr(exc, "code", None) == 400
+        else:
+            raise AssertionError("proxy accepted a second model call")
     finally:
         proxy.close()
         upstream.shutdown()

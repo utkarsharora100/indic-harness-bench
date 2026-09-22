@@ -13,6 +13,12 @@ used an inconsistent `/workspace` file-tool path, omitted upstream task hooks,
 truncated oracle output, and reported binary scores at a perfect-score
 threshold. The corrected experiment uses a new database and experiment ID.
 
+The current evidence boundary is the corrected `phase1_corrected_pilot_v12`
+45-cell pilot: five tasks, three languages, three harnesses, and one fresh
+attempt per condition. It completed with 45 oracle-gradable cells and 45 valid
+process judgments. The planned 648-cell main study has not been run and is not
+part of the current findings.
+
 ## Fixed study contract
 
 - Branch: `prishiv_dev`.
@@ -23,7 +29,7 @@ threshold. The corrected experiment uses a new database and experiment ID.
   OpenClaw harnesses; one university GPU model; temperature `0`; top-p `1`;
   maximum 2,048 generated tokens per model call; maximum 40 agent steps; three
   fresh repetitions.
-- Matrix: 24 × 3 × 3 × 3 = 648 stable cells, with a 45-cell pilot first.
+- Main matrix: 24 × 3 × 3 × 3 = 648 stable cells, with a 45-cell pilot first.
   Conditions are randomized within task/attempt blocks using seed `1701` and
   run sequentially to avoid shared-GPU contention. Temperature-zero repetitions
   are not treated as independent random draws.
@@ -43,22 +49,24 @@ reports, traces, or issue comments. The exact served model identity is written
 only to the ignored experiment manifest after `/models` and a tool-call check.
 The runner stops if that inventory changes.
 
-Build and gate the local image:
+Build and gate the local images:
 
 ```powershell
 docker build -f docker/phase1.Dockerfile -t indic-harness-phase1:2026-09-21 .
 py -3.14 -m scripts.prepare_phase1 --source ..\harness-bench
-py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.pilot.yaml --source ..\harness-bench
+py -3.14 -m scripts.provision_phase1_runtime
+py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.pilot-v12.yaml --source ..\harness-bench
 ```
 
 The `harness-bench` checkout is read-only reference input; the preparation
 script copies selected tasks into ignored `data/phase1/tasks/`.
 
-Before the pilot, provision the official stable NanoBot and OpenClaw releases
-as the image names in `configs/agents.phase1.yaml`, record each immutable
-`image_digest`, and create the Docker-internal `phase1-agent-net` network. The
-preflight rejects missing or mismatched digests and rejects non-internal
-networks. It does not substitute the old host-process wrappers.
+Before the pilot, `scripts.provision_phase1_runtime.py` builds and records the
+official stable NanoBot `v0.3.5`, OpenClaw `v2026.9.5`, and proxy images in the
+ignored runtime manifest, then creates the Docker-internal
+`phase1-agent-net` network. The preflight rejects missing or mismatched image
+IDs and rejects non-internal networks. It does not substitute the old
+host-process wrappers.
 
 For a new Docker engine, the network shape is:
 
@@ -75,16 +83,19 @@ not invent or silently substitute a NanoBot/OpenClaw release.
 Run the corrected 45-cell pilot first:
 
 ```powershell
-py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot.yaml --resume
-py -3.14 -m runner.cli judge --config configs/phase1.corrected.pilot.yaml
-py -3.14 -m runner.cli corrected-report --config configs/phase1.corrected.pilot.yaml --output data/phase1/corrected/pilot/provisional_report.md
+py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.pilot-v12.yaml --source ..\harness-bench
+py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot-v12.yaml --resume
+py -3.14 -m runner.cli judge --config configs/phase1.corrected.pilot-v12.yaml --rerun
+py -3.14 -m runner.cli corrected-report --config configs/phase1.corrected.pilot-v12.yaml --output data/phase1/corrected/pilot-v12/provisional_report.md
 ```
 
-Inspect all 15 task traces and grades. If a translation or environment defect is
+Inspect all 45 pilot cell traces and grades. If a translation or environment defect is
 found, freeze a new dataset/config version; do not rewrite the meaning of old
 runs.
 
-Run the main matrix only after the pilot passes infrastructure checks:
+The main matrix is intentionally deferred for this project milestone. When it
+is authorized later, run it only after a new protocol decision and a fresh
+preflight:
 
 ```powershell
 py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.research.yaml --source ..\harness-bench
@@ -111,10 +122,10 @@ collected.
 Create a convenient secret-free index of all per-cell logs with:
 
 ```powershell
-py -3.14 scripts/export_run_index.py --database data/phase1/corrected/runs.sqlite --output data/phase1/corrected/run-index.csv --experiment-id phase1_corrected_v1
+py -3.14 scripts/export_run_index.py --database data/phase1/corrected/pilot-v12/runs.sqlite --output data/phase1/corrected/pilot-v12/run-index.csv --experiment-id phase1_corrected_pilot_v12
 ```
 
-This writes the ignored `data/phase1/experiment/run-index.csv`; the `cell_id`
+This writes the ignored pilot run index; the `cell_id`
 column maps each matrix condition to its JSONL trace and result JSON.
 
 Export the translation checklist for team review:
@@ -140,8 +151,11 @@ human annotation.
 Build the research-facing PDF from the completed local database with:
 
 ```powershell
-py -3.14 scripts/build_corrected_pdf.py --report data/phase1/corrected/provisional_report.json --output data/phase1/corrected/provisional_report.pdf
+py -3.14 scripts/build_corrected_pdf.py --report data/phase1/corrected/pilot-v12/provisional_report.json --output data/phase1/corrected/pilot-v12/provisional_report.pdf
 ```
 
-The PDF is a tracked, privacy-safe summary; raw SQLite, traces, results, and
-the exact private model manifest remain ignored local artifacts.
+The corrective pilot PDF and raw SQLite/traces/results remain ignored local
+artifacts. The earlier tracked findings PDF is marked superseded by the
+corrective protocol and must not be used as the Phase I headline result. The
+current pilot report is provisional because the Hindi and Hinglish translations
+remain unreviewed.

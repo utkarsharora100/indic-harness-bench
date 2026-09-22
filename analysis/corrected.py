@@ -20,7 +20,8 @@ def load_corrected_rows(database: Path, experiment_id: str) -> list[dict[str, An
     try:
         query = """
             SELECT r.*, g.score AS outcome_score, g.status AS grade_status,
-                   pg.status AS process_status, pg.process_score, pg.security_score,
+                   pg.status AS process_status, pg.tool_use_appropriate,
+                   pg.consistency, pg.robustness, pg.process_score, pg.security_score,
                    pg.combined_score
             FROM run r
             JOIN grade g ON g.run_id = r.run_id AND g.kind = 'task'

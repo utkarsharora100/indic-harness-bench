@@ -341,6 +341,7 @@ class RunStore:
         )
 
     def finish_cell(self, cell_id: str, **values: Any) -> None:
+        success = values.get("success")
         self.connection.execute(
             """UPDATE run SET end_time=?, status=?, success=?, input_tokens=?, output_tokens=?,
                 total_tokens=?, initial_prompt_tokens=?, tool_calls=?, failed_tool_calls=?,
@@ -349,7 +350,7 @@ class RunStore:
             (
                 values.get("end_time"),
                 values["status"],
-                int(values.get("success", False)),
+                None if success is None else int(success),
                 values.get("input_tokens"),
                 values.get("output_tokens"),
                 values.get("total_tokens"),

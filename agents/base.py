@@ -16,6 +16,7 @@ class AgentRequest:
     max_steps: int
     command_runner: Callable[[str], dict[str, Any]] | None = None
     command_timeout_seconds: int | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

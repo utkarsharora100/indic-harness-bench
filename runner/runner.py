@@ -24,6 +24,7 @@ from runner.grader import GradeResult, GraderInfrastructureError, run_grader, ru
 from runner.inference import InferenceTransientError, public_model_config
 from runner.log import RunStore
 from runner.proxy import InferenceProxy
+from runner.proxy_sidecar import ProxySidecar
 from runner.redaction import redact
 from runner.sandbox import SandboxInfrastructureError, WorkspaceSandbox
 
@@ -110,6 +111,11 @@ class ExperimentRunner:
                     str(model_config["base_url"]),
                     str(model_config["api_key"]),
                     str(model_config["model"]),
+                    public_model=str(proxy_config.get("public_model", "phase1-university-model")),
+                    max_calls_per_cell=int(proxy_config.get("max_calls_per_cell", 40)),
+                    temperature=float(config.generation.get("temperature", 0.0)),
+                    top_p=float(config.generation.get("top_p", 1.0)),
+                    max_tokens=int(config.generation.get("max_tokens", 2048)),
                 ).start()
                 self.proxies[model_name] = proxy
                 public = dict(model_config)
@@ -498,12 +504,43 @@ class ExperimentRunner:
                         {"keys": sorted(runtime_env), "hook": task.upstream.hooks_module},
                     )
                 )
-            agent = build_agent(
-                cell.agent,
-                self.agents[cell.agent],
-                model_config,
-                int(self.config.inference.get("timeout_seconds", task.limits.timeout_seconds)),
-            )
+            sidecar: ProxySidecar | None = None
+            agent_model_config = model_config
+            if cell.agent != "react":
+                host_proxy = self.proxies.get(cell.model)
+                if host_proxy is None:
+                    raise RuntimeError("Native harness requires the university model proxy")
+                proxy_config = self.config.inference.get("proxy") or {}
+                sidecar = ProxySidecar(
+                    image=str(proxy_config.get("image", "indic-harness-proxy:phase1-pinned")),
+                    internal_network=str(self.agents[cell.agent].get("network", "phase1-agent-net")),
+                    egress_network=str(proxy_config.get("egress_network", "bridge")),
+                    upstream_base_url=host_proxy.upstream_base_url,
+                    upstream_key=host_proxy.upstream_key,
+                    resolved_model=host_proxy.resolved_model,
+                    public_model=host_proxy.public_model,
+                    trace_root=self.config.root / self.config.storage["traces_dir"] / "sidecars",
+                    cell_id=cell.cell_id,
+                    max_calls=int(proxy_config.get("max_calls_per_cell", 40)),
+                    temperature=float(self.config.generation.get("temperature", 0.0)),
+                    top_p=float(self.config.generation.get("top_p", 1.0)),
+                    max_tokens=int(self.config.generation.get("max_tokens", 2048)),
+                ).start()
+                agent_model_config = sidecar.model_config(model_config)
+            try:
+                agent = build_agent(
+                    cell.agent,
+                    self.agents[cell.agent],
+                    agent_model_config,
+                    int(task.limits.timeout_seconds),
+                )
+            except Exception:
+                # A startup/configuration failure can happen after the
+                # sidecar is already running. Do not leave its private-key
+                # environment or stable DNS name behind for the next cell.
+                if sidecar is not None:
+                    sidecar.close()
+                raise
             workspace_for_prompt = "/workspace" if self.config.sandbox["mode"] == "docker" else sandbox.workspace
             request = AgentRequest(
                 instruction=render_runtime_template(
@@ -513,16 +550,20 @@ class ExperimentRunner:
                 ),
                 workspace=str(sandbox.workspace),
                 system_prompt=SYSTEM_PROMPT,
-                model=model_config["model"],
+                # ReAct talks to the host proxy and uses the resolved model
+                # internally. Native harnesses must receive only the proxy's
+                # public alias; the sidecar owns the private upstream ID.
+                model=agent_model_config.get("model", model_config["model"]),
                 temperature=float(self.config.generation["temperature"]),
                 top_p=float(self.config.generation["top_p"]),
                 max_tokens=int(self.config.generation["max_tokens"]),
                 max_steps=task.limits.max_steps,
                 command_runner=sandbox.run_command if self.config.sandbox["mode"] == "docker" else None,
                 command_timeout_seconds=task.limits.timeout_seconds,
+                metadata={"cell_id": cell.cell_id, "attempt_id": attempt_id, "session_id": attempt_id},
             )
             agent_started = monotonic()
-            proxy = self.proxies.get(cell.model) if cell.agent != "react" else None
+            proxy = self.proxies.get(cell.model) if cell.agent == "react" else None
             if proxy is not None:
                 proxy.begin_cell(cell.cell_id)
             try:
@@ -531,6 +572,23 @@ class ExperimentRunner:
                 finally:
                     agent.close()
                 agent_time = monotonic() - agent_started
+                active_proxy = proxy or sidecar
+                if active_proxy is not None:
+                    usage = (
+                        proxy.cell_usage()
+                        if proxy is not None
+                        else sidecar.snapshot().get("usage", {})
+                    )
+                    if any(isinstance(value, int) and value > 0 for value in usage.values()):
+                        response.usage = usage
+                    response.metadata["proxy_calls"] = (
+                        proxy._cell_calls if proxy is not None else sidecar.snapshot().get("calls", 0)
+                    )
+                if cell.agent != "react":
+                    response.metadata["tool_calls"] = int(response.metadata.get("native_tool_calls", 0) or 0)
+                    response.metadata["failed_tool_calls"] = int(
+                        response.metadata.get("native_failed_tool_calls", 0) or 0
+                    )
                 for event in response.metadata.get("events", []):
                     event_type = event.get("event_type", "agent_event")
                     event_payload = redact(
@@ -638,6 +696,28 @@ class ExperimentRunner:
                             timestamp=trace_event["timestamp"],
                             result=proxy_event.get("data", {}),
                         )
+                if sidecar is not None:
+                    sidecar_snapshot = sidecar.snapshot()
+                    for sidecar_event in sidecar_snapshot.get("events", []):
+                        trace_event = self._event(
+                            cell.cell_id,
+                            0,
+                            sidecar_event.get("event_type", "proxy_event"),
+                            sidecar_event.get("data", {}),
+                        )
+                        trace_event["timestamp"] = sidecar_event.get(
+                            "timestamp", trace_event["timestamp"]
+                        )
+                        trace.append(trace_event)
+                        self.store.add_event(
+                            run_id=cell.cell_id,
+                            attempt_id=attempt_id,
+                            step=0,
+                            event_type=trace_event["event_type"],
+                            timestamp=trace_event["timestamp"],
+                            result=sidecar_event.get("data", {}),
+                        )
+                    sidecar.close()
                 if task.upstream is not None:
                     cleanup_runtime(
                         task_root / task.upstream.source_dir,

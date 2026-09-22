@@ -14,6 +14,7 @@ from runner.judge import judge_database
 from runner.config import ExperimentConfig
 from runner.inference import ensure_model_manifest
 from runner.runner import ExperimentRunner
+from runner.preflight import PreflightError, full_preflight
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -57,6 +58,15 @@ def run(
     agents, models, _ = load_runtime(experiment_config)
     task_ids = experiment_config.configured_task_ids
     task_defs = select_tasks(experiment_config.task_root, task_ids)
+    try:
+        gate = full_preflight(experiment_config, task_defs, agents, models)
+    except PreflightError as exc:
+        console.print(f"Preflight failed: {exc}")
+        raise typer.Exit(code=2) from exc
+    console.print(
+        f"Preflight passed: {gate['matrix']['cells']} cells, "
+        f"{gate['prepared_tasks']} prepared tasks and {gate['language_variants']} variants."
+    )
     runner = ExperimentRunner(experiment_config, agents, models)
     try:
         matrix = runner.validate_matrix(task_defs)
@@ -107,6 +117,7 @@ def judge(
     config: Path = typer.Option(Path("configs/phase1.corrected.research.yaml"), exists=True),
     database: Path | None = typer.Option(None),
     experiment_id: str | None = typer.Option(None),
+    rerun: bool = typer.Option(False, "--rerun", help="Recompute all process judgments under the current frozen normalizer."),
 ) -> None:
     """Run the frozen paper-style process rubric after agent execution."""
     experiment_config = ExperimentConfig.load(config)
@@ -120,6 +131,8 @@ def judge(
             runner.models[model_name],
             experiment_id=experiment_id or experiment_config.experiment_id,
             max_tokens=int(experiment_config.generation.get("max_tokens", 2048)),
+            proxy=runner.proxies.get(model_name),
+            rerun=rerun,
         )
     finally:
         runner.close()

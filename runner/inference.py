@@ -167,7 +167,12 @@ def resolve_university_gpu(
     return endpoint, manifest
 
 
-def verify_tool_call(endpoint: InferenceEndpoint, timeout_seconds: int = 90) -> dict[str, Any]:
+def verify_tool_call(
+    endpoint: InferenceEndpoint,
+    timeout_seconds: int = 90,
+    *,
+    max_tokens: int = 100,
+) -> dict[str, Any]:
     payload = {
         "model": endpoint.resolved_model,
         "messages": [{"role": "user", "content": "Use the add tool to add 2 and 3."}],
@@ -188,7 +193,7 @@ def verify_tool_call(endpoint: InferenceEndpoint, timeout_seconds: int = 90) -> 
         ],
         "tool_choice": "auto",
         "temperature": 0,
-        "max_tokens": 100,
+        "max_tokens": max_tokens,
         "stream": False,
     }
     response = _json_request(
