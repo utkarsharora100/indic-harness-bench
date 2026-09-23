@@ -22,8 +22,8 @@ def main() -> None:
     if args.source:
         result["dataset"] = prepare(
             args.source.resolve(),
-            config.root / "benchmark/task_selection.yaml",
-            config.root / "benchmark/translations/phase1.yaml",
+            config.root / config.experiment.get("dataset_manifest", "benchmark/task_selection.yaml"),
+            config.root / config.experiment.get("translations_manifest", "benchmark/translations/phase1.yaml"),
             config.task_root,
             check_only=True,
         )

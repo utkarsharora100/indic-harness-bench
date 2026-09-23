@@ -59,18 +59,20 @@ pytest
 
 ## Phase I execution
 
-The source checkout `../harness-bench` is read-only reference input. Prepare
-the pinned 24-task cache, build the controlled image, run the pilot, then run
-the full matrix as described in [the protocol](docs/phase1_protocol.md).
+The source checkout `../harness-bench` is read-only reference input. The v12
+pilot is superseded for language inference because Windows checkout conversion
+changed oracle-sensitive fixture bytes. The v13 five-task pilot uses canonical
+Git blobs and a new ignored database; the 648-cell main study is deferred.
+See [the protocol](docs/phase1_protocol.md) for the full gates.
 
 ```powershell
-py -3.14 -m scripts.prepare_phase1 --source ..\harness-bench
-docker build -f docker/phase1.Dockerfile -t indic-harness-phase1:2026-09-21 .
-py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.pilot.yaml --source ..\harness-bench
-py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot.yaml --resume
-py -3.14 -m runner.cli judge --config configs/phase1.corrected.pilot.yaml
-py -3.14 -m runner.cli corrected-report --config configs/phase1.corrected.pilot.yaml
-py -3.14 scripts/build_corrected_pdf.py --report data/phase1/corrected/pilot/provisional_report.json --output data/phase1/corrected/pilot/provisional_report.pdf
+py -3.14 -m scripts.prepare_phase1 --source ..\harness-bench --selection benchmark/task_selection.v13.yaml --translations benchmark/translations/phase1.v13.yaml --destination data/phase1/tasks-v13
+py -3.14 -m scripts.provision_phase1_runtime --config configs/phase1.corrected.pilot-v13.yaml
+py -3.14 -m scripts.calibrate_pilot_budget --config configs/phase1.corrected.pilot-v13.yaml
+py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.pilot-v13.yaml --source ..\harness-bench
+py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot-v13.yaml --resume
+py -3.14 -m runner.cli judge --config configs/phase1.corrected.pilot-v13.yaml
+py -3.14 -m runner.cli corrected-report --config configs/phase1.corrected.pilot-v13.yaml --output data/phase1/corrected/pilot-v13/provisional_report.md
 ```
 
 Raw databases, traces, model manifests, and provisional reports live under

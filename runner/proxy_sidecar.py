@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from runner.inference import InferenceTransientError
+
 
 class ProxySidecar:
     """One-cell model proxy reachable only from the internal agent network."""
@@ -109,13 +111,39 @@ class ProxySidecar:
 
     def snapshot(self) -> dict[str, Any]:
         path = self.host_trace / "proxy.json"
-        if not path.is_file():
-            return {"events": [], "usage": {}, "calls": 0}
-        try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {"events": [], "usage": {}, "calls": 0}
-        return value if isinstance(value, dict) else {"events": [], "usage": {}, "calls": 0}
+        for _ in range(10):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(value, dict):
+                    return value
+            except (OSError, json.JSONDecodeError):
+                time.sleep(0.1)
+        raise RuntimeError("Model proxy did not write a valid trace snapshot")
+
+    def seal(self) -> dict[str, Any]:
+        """Flush the sidecar after agent exit, then read its final trace."""
+        if self.container is None:
+            raise RuntimeError("Model proxy sidecar was not started")
+        self.container.kill(signal="SIGTERM")
+        self.container.wait(timeout=10)
+        snapshot = self.snapshot()
+        events = snapshot.get("events") or []
+        calls = int(snapshot.get("calls", 0))
+        requests = sum(event.get("event_type") == "proxy_request" for event in events)
+        responses = sum(event.get("event_type") == "proxy_response" for event in events)
+        errors = [event.get("data") or {} for event in events
+                  if event.get("event_type") == "proxy_error"]
+        if calls >= 1 and requests == calls and responses + len(errors) == calls and errors:
+            if all(data.get("error") == "upstream_unreachable"
+                   or data.get("status") in {408, 425, 429}
+                   or isinstance(data.get("status"), int) and data["status"] >= 500
+                   for data in errors):
+                raise InferenceTransientError("Transient upstream failure recorded by the model sidecar")
+        if calls < 1 or requests != calls or responses != calls:
+            raise RuntimeError(
+                f"Incomplete model proxy trace: calls={calls}, requests={requests}, responses={responses}"
+            )
+        return snapshot
 
     def model_config(self, original: dict[str, Any]) -> dict[str, Any]:
         config = dict(original)

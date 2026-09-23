@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import hashlib
 import json
 import yaml
 
@@ -11,6 +12,11 @@ from runner.inference import InferenceEndpoint, verify_tool_call
 from runner.proxy import InferenceProxy
 from runner.proxy_sidecar import ProxySidecar
 from benchmark.loader import select_tasks
+from benchmark.translation import validate_translation
+from benchmark.upstream import cleanup_runtime, prepare_runtime, render_runtime_template
+from runner.grader import run_upstream_oracle
+from runner.sandbox import WorkspaceSandbox
+from scripts.prepare_phase1 import tree_sha256
 
 
 class PreflightError(RuntimeError):
@@ -28,6 +34,10 @@ def check_docker_image(config: ExperimentConfig) -> dict[str, Any]:
     try:
         client.ping()
         image = client.images.get(config.sandbox["image"])
+        if config.experiment.get("version") == "corrected-v13":
+            expected = str(((_runtime_manifest(config).get("images") or {}).get("benchmark") or {}).get("image_id", ""))
+            if not expected or str(image.attrs.get("Id", "")) != expected:
+                raise PreflightError("Benchmark image differs from the frozen v13 runtime manifest")
         digest = None
         repo_digests = getattr(image, "attrs", {}).get("RepoDigests", [])
         if repo_digests:
@@ -100,7 +110,6 @@ def check_native_runtimes(config: ExperimentConfig, agents: dict[str, Any]) -> d
                     command=command,
                     network=network_name,
                     network_disabled=False,
-                    extra_hosts={"host.docker.internal": "host-gateway"},
                 )
                 try:
                     container.start()
@@ -153,6 +162,53 @@ def check_proxy_image(config: ExperimentConfig) -> dict[str, Any]:
         return {"enabled": True, "image": image_name, "image_id": image_id}
     except docker.errors.DockerException as exc:
         raise PreflightError(f"Model proxy image is unavailable: {image_name}") from exc
+    finally:
+        client.close()
+
+
+def check_shared_task_tools(config: ExperimentConfig, agents: dict[str, Any]) -> dict[str, Any]:
+    """Require equivalent executable task resources in all three harness images."""
+    if config.experiment.get("version") != "corrected-v13":
+        return {"checked": False}
+    import docker
+
+    manifest = _runtime_manifest(config)
+    images = {
+        "react": config.sandbox["image"],
+        "nanobot": agents["nanobot"]["image"],
+        "openclaw": agents["openclaw"]["image"],
+    }
+    probe = (
+        "import csv,io,json,platform,pandas,pytest; "
+        "rows=list(csv.DictReader(io.StringIO('id,value\\na,2\\nb,3\\n'))); "
+        "assert sum(int(r['value']) for r in rows)==5; "
+        "assert pandas.DataFrame(rows)['value'].astype(int).sum()==5; "
+        "print(json.dumps({'python':platform.python_version(),"
+        "'pandas':pandas.__version__,'pytest':pytest.__version__}))"
+    )
+    client = docker.from_env()
+    observed: dict[str, Any] = {}
+    try:
+        for name, image_name in images.items():
+            image = client.images.get(image_name)
+            expected = str(((manifest.get("images") or {}).get("benchmark" if name == "react" else name) or {}).get("image_id", ""))
+            if not expected or image.attrs.get("Id") != expected:
+                raise PreflightError(f"Task-tool image ID drifted: {name}")
+            container = client.containers.create(image_name, command=["python", "-c", probe], network_disabled=True)
+            try:
+                container.start()
+                waited = container.wait(timeout=30)
+                output = container.logs().decode("utf-8", errors="replace")
+                if int(waited.get("StatusCode", 1)) != 0:
+                    raise PreflightError(f"Task-tool parity probe failed in {name}: {output[-300:]}")
+                observed[name] = json.loads(output.strip().splitlines()[-1])
+            finally:
+                container.remove(force=True)
+        if len({json.dumps(value, sort_keys=True) for value in observed.values()}) != 1:
+            raise PreflightError(f"Task-tool versions differ across harnesses: {observed}")
+        return {"checked": True, "versions": observed["react"]}
+    except docker.errors.DockerException as exc:
+        raise PreflightError(f"Task-tool parity Docker check failed: {exc}") from exc
     finally:
         client.close()
 
@@ -219,13 +275,14 @@ result = call('/chat/completions', {
     'model': os.environ['PHASE1_PROXY_MODEL'],
     'messages': [{'role': 'user', 'content': 'Use the add tool to add 2 and 3.'}],
     'tools': [{'type': 'function', 'function': {'name': 'add', 'description': 'Add two integers.', 'parameters': {'type': 'object', 'properties': {'a': {'type': 'integer'}, 'b': {'type': 'integer'}}, 'required': ['a', 'b'], 'additionalProperties': False}}}],
-    'tool_choice': 'auto', 'temperature': 0, 'top_p': 1, 'max_tokens': 2048, 'stream': False,
+    'tool_choice': 'auto', 'temperature': 0, 'top_p': 1, 'max_tokens': __MAX_TOKENS__, 'stream': False,
 })
 calls = ((result.get('choices') or [{}])[0].get('message') or {}).get('tool_calls')
 if not calls or calls[0].get('function', {}).get('name') != 'add':
     raise RuntimeError('tool-call-mismatch')
 print('proxy-ok')
 """
+        probe_script = probe_script.replace("__MAX_TOKENS__", str(int(config.generation.get("max_tokens", 2048))))
         probe = client.containers.run(
             config.sandbox["image"],
             command=["python", "-c", probe_script],
@@ -251,7 +308,7 @@ print('proxy-ok')
             raise PreflightError(
                 f"The internal model-proxy tool-call probe failed (exit={status_code}, {diagnostic or 'no-safe-diagnostic'})"
             )
-        snapshot = sidecar.snapshot()
+        snapshot = sidecar.seal()
         if int(snapshot.get("calls", 0)) != 1:
             raise PreflightError("The internal model proxy did not record the probe call")
         if endpoint.resolved_model in json.dumps(snapshot, ensure_ascii=False):
@@ -276,6 +333,10 @@ def check_prepared_tasks(config: ExperimentConfig, tasks: list[Any]) -> dict[str
     expected = {str(item["task_id"]): str(item.get("source_sha256", "")) for item in selection.get("tasks", [])}
     if set(expected) != {task.task_id for task in tasks}:
         raise PreflightError("Prepared task set does not match the pinned selection manifest")
+    translation_path = config.root / config.experiment.get(
+        "translations_manifest", "benchmark/translations/phase1.yaml"
+    )
+    translations = (yaml.safe_load(translation_path.read_text(encoding="utf-8")) or {}).get("tasks", {})
     checked = 0
     for task in tasks:
         task_root = config.task_root / task.task_id
@@ -284,12 +345,41 @@ def check_prepared_tasks(config: ExperimentConfig, tasks: list[Any]) -> dict[str
         if not marker.is_file() or not source.is_dir():
             raise PreflightError(f"Prepared task is incomplete: {task.task_id}")
         actual = marker.read_text(encoding="utf-8").strip()
-        if expected.get(task.task_id) and actual != expected[task.task_id]:
+        actual_tree = tree_sha256(source)
+        if expected.get(task.task_id) and (actual != expected[task.task_id] or actual_tree != actual):
             raise PreflightError(f"Prepared task hash mismatch: {task.task_id}")
+        record = translations.get(task.task_id)
+        if not isinstance(record, dict) or record.get("source_sha256") != actual_tree:
+            raise PreflightError(f"Translation provenance mismatch: {task.task_id}")
+        canonical_prompt = (source / "prompt.txt").read_text(encoding="utf-8")
+        if task.instruction_for("english") != canonical_prompt:
+            raise PreflightError(f"Canonical English prompt mismatch: {task.task_id}")
         for language in ("english", "hindi", "hinglish"):
             prompt = task.instruction_for(language)
             if not isinstance(prompt, str) or not prompt.strip():
                 raise PreflightError(f"Empty {language} prompt: {task.task_id}")
+            if prompt != (record.get("instructions") or {}).get(language):
+                raise PreflightError(f"Translation overlay mismatch: {task.task_id}/{language}")
+            if language != "english" and validate_translation(canonical_prompt, prompt):
+                raise PreflightError(f"Protected translation entity mismatch: {task.task_id}/{language}")
+        if task.task_id == "016-code-repair-pytest":
+            import importlib.util
+
+            oracle_path = source / "oracle_grade.py"
+            spec = importlib.util.spec_from_file_location("phase1_preflight_016", oracle_path)
+            if spec is None or spec.loader is None:
+                raise PreflightError("Cannot load pinned code-repair oracle")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            test_file = source / "fixtures" / "in" / "app" / "test_config.py"
+            if hashlib.md5(test_file.read_bytes()).hexdigest() != module.EXPECTED_TEST_HASH:
+                raise PreflightError("Code-repair pristine test hash fails its oracle")
+        if task.task_id == "050-multitable-join-analysis":
+            truth = json.loads((source / "ground_truth.json").read_text(encoding="utf-8"))
+            for relative, expected_digest in truth.get("fixture_hashes", {}).items():
+                fixture = source / "fixtures" / "in" / relative
+                if not fixture.is_file() or hashlib.sha256(fixture.read_bytes()).hexdigest() != expected_digest:
+                    raise PreflightError(f"Pristine data fixture fails oracle hash: {relative}")
         checked += 1
     return {"prepared_tasks": checked, "language_variants": checked * 3}
 
@@ -318,12 +408,93 @@ def full_preflight(
     if not configured_ids.issubset({task.task_id for task in all_prepared}):
         raise PreflightError("Configured pilot tasks are not all present in the prepared cache")
     result.update(check_prepared_tasks(config, all_prepared))
+    result["fresh_fixtures"] = check_pilot_fixture_parity(config, tasks)
+    result["calibration"] = check_calibration(config)
     result["docker"] = check_docker_image(config)
     result.update(check_native_runtimes(config, agents))
+    result["task_tools"] = check_shared_task_tools(config, agents)
     result["proxy_image"] = check_proxy_image(config)
     result["proxy_sidecar"] = check_proxy_sidecar(config, agents)
     result["runtime"] = runtime_preflight(config)
     return result
+
+
+def check_pilot_fixture_parity(config: ExperimentConfig, tasks: list[Any]) -> dict[str, Any]:
+    """Recreate post-hook workspaces in all conditions before any cell exists."""
+    if config.experiment.get("version") != "corrected-v13":
+        return {"checked": False}
+    from runner.runner import workspace_sha256
+
+    fixture_hashes: dict[str, str] = {}
+    baseline_oracle: dict[str, float] = {}
+    for task in tasks:
+        if task.upstream is None:
+            raise PreflightError(f"Pilot task lacks pinned upstream contract: {task.task_id}")
+        source = config.task_root / task.task_id / task.upstream.source_dir
+        observed: set[str] = set()
+        for agent in config.experiment["agents"]:
+            for language in config.experiment["languages"]:
+                with WorkspaceSandbox(None, config.sandbox["image"], "local",
+                                      fixtures=source / task.upstream.fixtures_dir) as sandbox:
+                    state = prepare_runtime(source, sandbox.root, sandbox.workspace, task.upstream.hooks_module)
+                    try:
+                        env = {key: str(value) for key, value in state.items()
+                               if isinstance(value, (str, int, float))}
+                        rendered = render_runtime_template(task.instruction_for(language),
+                                                           workspace="/workspace", runtime_env=env)
+                        if "$WORKSPACE" in rendered or not rendered.strip() or str(sandbox.workspace) in rendered:
+                            raise PreflightError(f"Unrendered or empty pilot prompt: {task.task_id}/{language}")
+                        observed.add(workspace_sha256(sandbox.workspace))
+                        if task.task_id not in baseline_oracle:
+                            grade = run_upstream_oracle(source, task.upstream.oracle_module,
+                                                        sandbox.workspace, task.upstream.expected_outcome_score)
+                            if grade.outcome_score is None:
+                                raise PreflightError(f"Pristine pilot oracle failed: {task.task_id}")
+                            baseline_oracle[task.task_id] = grade.outcome_score
+                    finally:
+                        cleanup_runtime(source, sandbox.root, sandbox.workspace,
+                                        task.upstream.hooks_module, state)
+        if len(observed) != 1:
+            raise PreflightError(f"Fresh post-hook fixtures differ across conditions: {task.task_id}")
+        fixture_hashes[task.task_id] = observed.pop()
+    return {"checked": True, "tasks": len(fixture_hashes),
+            "conditions_per_task": len(config.experiment["agents"]) * len(config.experiment["languages"]),
+            "post_hook_hashes": fixture_hashes, "pristine_oracle_scores": baseline_oracle}
+
+
+def check_calibration(config: ExperimentConfig) -> dict[str, Any]:
+    """A v13 pilot cannot run with an untested or changed generation cap."""
+    if config.experiment.get("version") != "corrected-v13":
+        return {"checked": False}
+    from scripts.calibrate_pilot_budget import PROBES
+
+    path = config.root / config.inference.get("calibration_manifest", "")
+    if not path.is_file():
+        raise PreflightError("The v13 synthetic generation-budget calibration is missing")
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PreflightError("The v13 calibration manifest is invalid") from exc
+    if record.get("experiment_id") != config.experiment_id:
+        raise PreflightError("Calibration belongs to another experiment")
+    selected = record.get("selected_max_tokens")
+    if selected not in (4096, 8192) or selected != config.generation.get("max_tokens"):
+        raise PreflightError("The configured generation cap differs from calibration")
+    digest = hashlib.sha256(json.dumps(PROBES).encode()).hexdigest()
+    if record.get("probes_sha256") != digest:
+        raise PreflightError("Synthetic calibration prompts changed")
+    passed = {trial.get("probe") for trial in record.get("trials", [])
+              if trial.get("cap") == selected and trial.get("valid_tool_call") is True}
+    if passed != set(range(len(PROBES))):
+        raise PreflightError("The selected generation cap did not pass every calibration probe")
+    model_manifest = config.root / config.inference["manifest"]
+    if not model_manifest.is_file():
+        raise PreflightError("The frozen model manifest is missing")
+    model = json.loads(model_manifest.read_text(encoding="utf-8"))
+    served = model.get("resolved_model")
+    if not isinstance(served, str) or record.get("served_model_sha256") != hashlib.sha256(served.encode()).hexdigest():
+        raise PreflightError("The calibrated served model differs from the frozen model")
+    return {"checked": True, "selected_max_tokens": selected}
 
 
 def runtime_preflight(config: ExperimentConfig) -> dict[str, Any]:

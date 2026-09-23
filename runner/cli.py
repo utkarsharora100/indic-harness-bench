@@ -14,7 +14,7 @@ from runner.judge import judge_database
 from runner.config import ExperimentConfig
 from runner.inference import ensure_model_manifest
 from runner.runner import ExperimentRunner
-from runner.preflight import PreflightError, full_preflight
+from runner.preflight import PreflightError, full_preflight, check_pilot_fixture_parity
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -78,7 +78,7 @@ def run(
     completed = sum(1 for result in results if result["status"] == "completed")
     console.print(
         f"Matrix {matrix['cells']} cells; processed {len(results)}; "
-        f"completed {completed}, successful {successful}, "
+        f"completed {completed}, perfect-score {successful}, "
         f"infrastructure errors {summary['infrastructure_error']}, pending {summary['pending']}."
     )
     if max_cells is None and (
@@ -105,7 +105,12 @@ def corrected_report(
 ) -> None:
     experiment_config = ExperimentConfig.load(config)
     db = database or (experiment_config.root / experiment_config.storage["database"])
-    result = build_corrected_report(db, output, experiment_id or experiment_config.experiment_id)
+    pristine = None
+    if experiment_config.experiment.get("version") == "corrected-v13":
+        tasks = select_tasks(experiment_config.task_root, experiment_config.configured_task_ids)
+        pristine = check_pilot_fixture_parity(experiment_config, tasks)["pristine_oracle_scores"]
+    result = build_corrected_report(db, output, experiment_id or experiment_config.experiment_id,
+                                    pristine_oracle_scores=pristine)
     console.print(
         f"Wrote {output}; {result['cells']['completed_rows']} completed cells, "
         f"{result['cells']['oracle_gradable']} oracle-gradable."
@@ -124,6 +129,7 @@ def judge(
     agents, models, _ = load_runtime(experiment_config)
     runner = ExperimentRunner(experiment_config, agents, models)
     try:
+        runner.assert_experiment_identity()
         model_name = str(experiment_config.experiment["models"][0])
         result = judge_database(
             experiment_config.root / (database or experiment_config.storage["database"]),

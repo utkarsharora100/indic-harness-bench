@@ -4,7 +4,6 @@ import argparse
 import hashlib
 import importlib.util
 import json
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -13,6 +12,7 @@ import yaml
 
 from benchmark.models import TaskDefinition
 from benchmark.translation import validate_translation
+from benchmark.canonical import blob_tree_sha256, git_bytes, materialize_blobs, task_blobs
 
 
 REQUIRED_SOURCE_FILES = ("task.yaml", "prompt.txt", "fixtures", "oracle_grade.py")
@@ -22,9 +22,12 @@ LANGUAGES = ("english", "hindi", "hinglish")
 def tree_sha256(root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(
-        item
-        for item in root.rglob("*")
-        if item.is_file() and "__pycache__" not in item.parts and item.suffix not in {".pyc", ".pyo"}
+        (
+            item
+            for item in root.rglob("*")
+            if item.is_file() and "__pycache__" not in item.parts and item.suffix not in {".pyc", ".pyo"}
+        ),
+        key=lambda item: item.relative_to(root).as_posix(),
     ):
         relative = path.relative_to(root).as_posix().encode("utf-8")
         digest.update(relative)
@@ -148,32 +151,25 @@ def prepare(
         )
 
     prepared: list[dict[str, Any]] = []
-    upstream_default_rubric = source / "grading" / "default_rubric.py"
-    if not upstream_default_rubric.is_file():
-        raise RuntimeError(f"Pinned source is missing grading/default_rubric.py: {upstream_default_rubric}")
+    upstream_default_rubric = git_bytes(source, "show", f"{revision}:grading/default_rubric.py")
     if not check_only:
         rubric_destination = destination / "grading" / "default_rubric.py"
         rubric_destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(upstream_default_rubric, rubric_destination)
+        rubric_destination.write_bytes(upstream_default_rubric)
     for item in selection["tasks"]:
         task_id = item["task_id"]
-        source_task = source / "tasks" / task_id
-        if not source_task.is_dir():
-            raise FileNotFoundError(f"Selected task does not exist: {source_task}")
-        missing = [name for name in REQUIRED_SOURCE_FILES if not (source_task / name).exists()]
+        blobs = task_blobs(source, revision, task_id)
+        missing = [name for name in REQUIRED_SOURCE_FILES if not any(
+            path == name or path.startswith(name + "/") for path in blobs
+        )]
         if missing:
             raise ValueError(f"{task_id} is missing required files: {', '.join(missing)}")
-        source_definition = yaml.safe_load(
-            (source_task / "task.yaml").read_text(encoding="utf-8")
-        ) or {}
-        validate_python_asset(source_task / str(source_definition.get("oracle_module", "oracle_grade.py")), "score_workspace")
-        hooks_path = source_task / str(source_definition.get("hooks_module", "hooks.py"))
-        if hooks_path.is_file():
-            validate_python_asset(hooks_path)
-        rubric_path = source_task / "llm_rubric.py"
-        if rubric_path.is_file():
-            validate_python_asset(rubric_path)
-        source_hash = tree_sha256(source_task)
+        source_definition = yaml.safe_load(blobs["task.yaml"][0].decode("utf-8")) or {}
+        for asset in (str(source_definition.get("oracle_module", "oracle_grade.py")),
+                      str(source_definition.get("hooks_module", "hooks.py")), "llm_rubric.py"):
+            if asset in blobs:
+                compile(blobs[asset][0], asset, "exec")
+        source_hash = blob_tree_sha256(blobs)
         expected_hash = item.get("source_sha256")
         if expected_hash and expected_hash != source_hash:
             raise RuntimeError(
@@ -188,7 +184,7 @@ def prepare(
         instructions = translation_record.get("instructions") or {}
         if any(not isinstance(instructions.get(language), str) for language in LANGUAGES):
             raise ValueError(f"Translation record for {task_id} is missing a language")
-        prompt = (source_task / "prompt.txt").read_text(encoding="utf-8")
+        prompt = blobs["prompt.txt"][0].decode("utf-8").replace("\r\n", "\n")
         if instructions["english"] != prompt:
             raise ValueError(f"English translation changed the canonical prompt for {task_id}")
         for language in ("hindi", "hinglish"):
@@ -203,12 +199,15 @@ def prepare(
         if not check_only:
             if target.exists():
                 existing_hash_path = target / ".source_sha256"
-                if not existing_hash_path.is_file() or existing_hash_path.read_text().strip() != source_hash:
+                if (not existing_hash_path.is_file()
+                        or existing_hash_path.read_text().strip() != source_hash
+                        or tree_sha256(target / "source") != source_hash):
                     raise RuntimeError(f"Prepared task already exists with a different source: {target}")
             else:
                 target.mkdir(parents=True, exist_ok=False)
-                shutil.copytree(source_task, target / "source")
+                materialize_blobs(blobs, target / "source")
                 (target / ".source_sha256").write_text(source_hash + "\n", encoding="utf-8")
+            validate_python_asset(target / "source" / str(source_definition.get("oracle_module", "oracle_grade.py")), "score_workspace")
             # Refresh the generated wrapper even when the ignored cache was
             # prepared by an older runner version.  The pinned source tree is
             # still protected by the hash check above.

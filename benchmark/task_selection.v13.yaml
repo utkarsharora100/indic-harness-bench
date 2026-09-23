@@ -1,0 +1,90 @@
+# v13: hashes refer to raw blobs at the pinned Git commit; prompt text is unchanged.
+# Phase I dataset contract. The source checkout must resolve to this exact commit
+# before task assets are prepared.
+source:
+  repository: https://github.com/Qihoo360/harness-bench
+  revision: 1025086a446653702b80cfb48babbeec35db6b2c
+
+target_count: 24
+
+quotas:
+  software_engineering: 6
+  data_file_processing: 5
+  shell_tool_use: 4
+  office_business: 4
+  knowledge_retrieval: 3
+  multi_step_workflow: 2
+
+tasks:
+  - task_id: 016-code-repair-pytest
+    category: software_engineering
+    source_sha256: ca2d2caad4707d9f6d8fd83171aac43374d705506a0603b9be8d3d2355bc1e79
+  - task_id: 039-repo-architecture-map
+    category: software_engineering
+    source_sha256: 6945ca030cfa4d65f3895c72f89bac8b7d8203eac83215b856ac2f590f82a0ae
+  - task_id: 040-test-coverage-fill
+    category: software_engineering
+    source_sha256: 8d8d7a5316d3e9e146cbf863cb2c5911dd1e50f366ec2e3bc2fbacbdfef89792
+  - task_id: 042-api-schema-migration
+    category: software_engineering
+    source_sha256: 487e1a28e8a654eefed3c0103e7d51ff162aff99baef2ac7bcced7e633aeb13b
+  - task_id: 043-db-migration-safety
+    category: software_engineering
+    source_sha256: 3a1b8a02eacd81b4f5e0ac8e578cadf1d8219cfe80cc85b3e5c14b88765b6952
+  - task_id: 087-cli-parser-bug-tests
+    category: software_engineering
+    source_sha256: c4d6abe697dcf8c8125eb0432ddfbb581931e72b79afba9b39e1d709d6ca8f79
+  - task_id: 049-excel-like-cleaning
+    category: data_file_processing
+    source_sha256: 19c40f5ecc0eacea4a072bc4d252fc89d02d8f57a77c1fa9a98100a13ee074fd
+  - task_id: 050-multitable-join-analysis
+    category: data_file_processing
+    source_sha256: cc10eab9c721883f5ee76794d18007996617a16d12a3f38ccbf7ed05a636dabf
+  - task_id: 051-sql-query-report
+    category: data_file_processing
+    source_sha256: 2a352aace07462f99a51d5690fab7bc222d394bf5907f4cbb3f10be93b5f80c1
+  - task_id: 053-anomalous-transaction-detect
+    category: data_file_processing
+    source_sha256: eb691bd9daf5f49ea3f4e986c94a0617ecc53d676e55dbd68cb471b830a326df
+  - task_id: 054-budget-variance-analysis
+    category: data_file_processing
+    source_sha256: 81ad8127c188f7d30684dd48baa1b716d4239cf9f79884ea97e38cd966d7d47a
+  - task_id: 001-file
+    category: shell_tool_use
+    source_sha256: e2b787e9f73ef6708d31b96d06ac98c63c86416ea7429bcddc2c0417f3a2a427
+  - task_id: 020-archive-checksum
+    category: shell_tool_use
+    source_sha256: a09e3424bcaaa8355fd00ae7b85d63381b8e263aaa577f57311e30d0f2b76bae
+  - task_id: 021-batch-rename-transform
+    category: shell_tool_use
+    source_sha256: ba6b55e7eb02078467ec928fffc6517e91ec1d8ccb1b1236489e6f003a871cb3
+  - task_id: 079-smallfile-batch-reject-ledger
+    category: shell_tool_use
+    source_sha256: 920da75207fc053eef438b10fb1dd9a12883afae3e2a828cf5c329b1a5ebc914
+  - task_id: 004-meeting-summary
+    category: office_business
+    source_sha256: 737c9f2c628dd44500131bfafb1c73a20cde56597d2b0bfb3414b81ab589947b
+  - task_id: 005-email-triage
+    category: office_business
+    source_sha256: fe379bd1cba19171affc76ec0ab43549a281f9e4343744909ecbf73ef681d860
+  - task_id: 025-meeting-action-tracker
+    category: office_business
+    source_sha256: d84090c4b7c100400485082f01df0d7b128d73f3897057e6e06abf3a61e08884
+  - task_id: 028-email-thread-merge
+    category: office_business
+    source_sha256: 558aa470b933037dd179ef115d2b3b3a83d7411aeac436ee418e2883b7414e81
+  - task_id: 012-doc-synthesis
+    category: knowledge_retrieval
+    source_sha256: 46330b33ecab7217937df7b3bd85dc885fafde586b3c4421284417a91b153501
+  - task_id: 033-offline-knowledge-qa
+    category: knowledge_retrieval
+    source_sha256: b396d674a09f7bd73d339743ae6d6365435c9414dc3bc10cc59be02f0c566931
+  - task_id: 035-conflicting-source-resolution
+    category: knowledge_retrieval
+    source_sha256: 586461c98bc70053ac049642235539ed76cfedc91b4dc43776b479bccf8b5dbe
+  - task_id: 019-incident-runbook-synthesis
+    category: multi_step_workflow
+    source_sha256: 78b462c6cb3802eae3fc0ddd608682a0cc27e5cd22ff6d2cd522d7e764c3b68a
+  - task_id: 068-product-launch-ops
+    category: multi_step_workflow
+    source_sha256: 719a319149f0f83f34bd0b9f5ae1a58ff2f9c404a64661f60f6813e5ad928257

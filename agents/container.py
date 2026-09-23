@@ -65,7 +65,7 @@ class ContainerHarnessAdapter:
                                 "primary": {
                                     "provider": "custom",
                                     "model": request.model,
-                                    "maxTokens": 2048,
+                                    "maxTokens": request.max_tokens,
                                     "temperature": 0.0,
                                 }
                             },
@@ -76,6 +76,7 @@ class ContainerHarnessAdapter:
                                     "maxToolIterations": 40,
                                 }
                             },
+                            "tools": {"restrictToWorkspace": True},
                         },
                         ensure_ascii=False,
                     ),
@@ -97,7 +98,7 @@ class ContainerHarnessAdapter:
                                                 "name": "Phase I university model",
                                                 "input": ["text"],
                                                 "contextWindow": 32768,
-                                                "maxTokens": 2048,
+                                                "maxTokens": request.max_tokens,
                                             }
                                         ],
                                     }
@@ -113,7 +114,7 @@ class ContainerHarnessAdapter:
                                         "workspace": "/workspace",
                                         "model": {"primary": f"phase1/{request.model}", "fallbacks": []},
                                         "thinkingDefault": "off",
-                                        "params": {"temperature": 0.0, "maxTokens": 2048},
+                                        "params": {"temperature": 0.0, "maxTokens": request.max_tokens},
                                         "tools": {
                                             # The release treats `allow` as an
                                             # intersection with the selected
@@ -162,7 +163,7 @@ class ContainerHarnessAdapter:
                 "PHASE1_MAX_CALLS": "40",
                 "PHASE1_TEMPERATURE": "0",
                 "PHASE1_TOP_P": "1",
-                "PHASE1_MAX_TOKENS": "2048",
+                "PHASE1_MAX_TOKENS": str(request.max_tokens),
                 "WORKSPACE": "/workspace",
                 "NANOBOT_HOME": self.config.state_mount,
                 "NANOBOT_WORKSPACE": "/workspace",
@@ -182,7 +183,6 @@ class ContainerHarnessAdapter:
                 },
                 network_disabled=self.config.network == "none",
                 network=self.config.network if self.config.network not in {"none", ""} else None,
-                extra_hosts={"host.docker.internal": "host-gateway"},
                 detach=True,
             )
             timeout = int(request.command_timeout_seconds or self.config.timeout_seconds)
@@ -203,6 +203,9 @@ class ContainerHarnessAdapter:
             native_metadata: dict[str, Any] = {}
             if self.name == "openclaw":
                 parsed = _parse_openclaw_json(output)
+                completion = parsed.get("completion") if isinstance(parsed, dict) else None
+                native_stop = completion.get("stopReason") if isinstance(completion, dict) else None
+                native_metadata["stop_reason"] = str(native_stop or "unknown")
                 summary = parsed.get("toolSummary") if isinstance(parsed, dict) else None
                 if isinstance(summary, dict):
                     native_metadata["tool_summary"] = {
@@ -217,7 +220,8 @@ class ContainerHarnessAdapter:
                 calls = sum(1 for line in output.splitlines() if line.lstrip().startswith(("↳", "->")))
                 native_metadata["tool_summary"] = {"calls": calls, "failures": 0, "tools": []}
             return AgentResponse(
-                completed=returncode == 0 and not timed_out,
+                completed=(returncode == 0 and not timed_out
+                           and (self.name != "openclaw" or native_metadata.get("stop_reason") == "stop")),
                 text=output,
                 usage={},
                 metadata={
@@ -232,6 +236,7 @@ class ContainerHarnessAdapter:
                     "native_tool_calls": native_metadata.get("tool_summary", {}).get("calls", 0),
                     "native_failed_tool_calls": native_metadata.get("tool_summary", {}).get("failures", 0),
                     "native_tool_summary": native_metadata.get("tool_summary", {}),
+                    "stop_reason": "timeout" if timed_out else native_metadata.get("stop_reason", "cli_exit"),
                 },
             )
         except Exception as exc:

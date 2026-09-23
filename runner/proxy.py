@@ -224,9 +224,8 @@ class InferenceProxy:
                     proxy._record_proxy_event("error", {"error": "upstream_unreachable"})
                     self._write_json(502, {"error": "upstream_unreachable"})
 
-        # The native harness container reaches this port through Docker's host
-        # gateway.  The client token and route allow-list still prevent it from
-        # becoming a general-purpose forwarding proxy.
+        # Native harnesses reach the sidecar through Docker's internal
+        # network; no host-gateway mapping is supplied to the agent.
         self.server = ThreadingHTTPServer((self.bind_host, self.listen_port), Handler)
         self.timeout_seconds = 120
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)

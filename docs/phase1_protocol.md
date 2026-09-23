@@ -1,161 +1,111 @@
-# Phase I corrective protocol and reproducibility guide
+# Phase I pilot protocol — canonical-byte correction (v13)
 
-This protocol is the tracked, secret-free description of the controlled English,
-Hindi, and Hinglish study. Hindi and Hinglish translations were authored before
-execution, but remain `unreviewed` until the team approves them. Results are
-therefore provisional.
+This is the tracked, secret-free protocol for the **five-task, 45-cell pilot**.
+The main 648-cell study is deferred. Do not pool experiments.
 
-## Study status
+## Evidence boundary
 
-The earlier `phase1_language_comparison` 216-cell experiment is retained as a
-superseded pilot. It is not pooled with the corrective study because its runner
-used an inconsistent `/workspace` file-tool path, omitted upstream task hooks,
-truncated oracle output, and reported binary scores at a perfect-score
-threshold. The corrected experiment uses a new database and experiment ID.
+The v12 pilot completed 45 oracle-gradable cells, but is **superseded for
+language inference**. On Windows, checkout conversion changed bytes in
+untouched task fixtures. In `016-code-repair-pytest`, this alone broke the
+oracle's expected test-file MD5 in every condition. Six pristine source CSVs
+in `050-multitable-join-analysis` likewise failed their oracle SHA-256 checks.
+Generation limits, missing task tools, and incomplete proxy traces are separate
+possible causes of low perfect completion. The v12 results are preserved in
+their ignored database and report; none is copied into v13.
 
-The current evidence boundary is the corrected `phase1_corrected_pilot_v12`
-45-cell pilot: five tasks, three languages, three harnesses, and one fresh
-attempt per condition. It completed with 45 oracle-gradable cells and 45 valid
-process judgments. The planned 648-cell main study has not been run and is not
-part of the current findings.
+The new experiment is `phase1_corrected_pilot_v13`, with distinct manifest,
+prepared-task cache, model/runtime/calibration manifests, database, traces,
+workspace archives, and reports. Hindi/Hinglish translations are unchanged and
+still unreviewed, so all language findings remain provisional.
 
-## Fixed study contract
+## Frozen design
 
-- Branch: `prishiv_dev`.
-- Harness-Bench source: `1025086a446653702b80cfb48babbeec35db6b2c`.
-- Selection: 24 tasks in `benchmark/task_selection.yaml`, with its recorded
-  source tree hashes and category quotas.
-- Conditions: English, Hindi, and Latin-script Hinglish; ReAct, NanoBot, and
-  OpenClaw harnesses; one university GPU model; temperature `0`; top-p `1`;
-  maximum 2,048 generated tokens per model call; maximum 40 agent steps; three
-  fresh repetitions.
-- Main matrix: 24 × 3 × 3 × 3 = 648 stable cells, with a 45-cell pilot first.
-  Conditions are randomized within task/attempt blocks using seed `1701` and
-  run sequentially to avoid shared-GPU contention. Temperature-zero repetitions
-  are not treated as independent random draws.
-- Isolation: each cell receives a fresh fixture copy in a pinned Docker image;
-  the source oracle is inaccessible to agents. A copied workspace is graded in
-  a separate ephemeral container. Native harness images are pinned separately.
-- Scoring: the complete continuous upstream `outcome_score` is primary;
-  perfect completion is secondary. The paper-style process/security aggregate
-  is recorded as diagnostic and uses the same university model as judge, so it
-  is not an independent validation.
+- Work and push only on `prishiv_dev`.
+- Pinned Harness-Bench Git commit:
+  `1025086a446653702b80cfb48babbeec35db6b2c`. The selection manifest is
+  `benchmark/task_selection.v13.yaml`; translation overlay is
+  `benchmark/translations/phase1.v13.yaml`. The 24 task definitions and 72
+  language variants are unchanged apart from provenance hashes of **raw Git
+  blobs**. No checkout line-ending conversion is permitted.
+- Pilot tasks: `001-file`, `016-code-repair-pytest`,
+  `050-multitable-join-analysis`, `025-meeting-action-tracker`, and
+  `019-incident-runbook-synthesis`. Each has English, Hindi, and Hinglish
+  prompts and ReAct, native NanoBot, and native OpenClaw runs: 45 fresh cells.
+- Primary descriptive outcome: each pinned task's continuous oracle score in
+  `[0,1]`. Perfect score is secondary, not the headline measure. Also retain
+  complete oracle checks, model/agent stop reasons, tool errors, token usage,
+  elapsed time, per-cell JSONL trace, and final workspace archive.
+- Task/harness/language order is shuffled within blocks using seed `1701` and
+  run sequentially. Temperature `0` does not make repetitions independent
+  samples. This pilot has only **one** execution per condition and five
+  purposively selected tasks; uncertainty intervals are exploratory only.
+- Same university model, prompt variant, fixtures, oracle, external task
+  timeout, at most 40 model calls, temperature `0`, and top-p `1`. ReAct and
+  native harnesses have different intrinsic tools/recovery behavior by design.
+  All three images must expose the same Python/pandas/pytest and base CLI task
+  tools. The generation cap is selected **before** cells run by synthetic
+  probes at 4,096 then 8,192 tokens, and frozen in the config. A failed probe
+  blocks the pilot; changing the cap after any run requires another version.
+- Grading uses an isolated copy of the workspace. The oracle and reference
+  answers never enter agent containers. Agents reach only a per-cell model
+  proxy through a Docker-internal network; the proxy alone has university
+  credentials and outbound access. The same model judges process/security
+  **afterward**, making those scores diagnostic rather than independent proof.
 
-## Private runtime setup
+## Reproduction gates
 
-Create the ignored `.env.uni-gpu.local` from the university-provided values.
-Never put its key, private URL, or server filesystem-backed model ID in source,
-reports, traces, or issue comments. The exact served model identity is written
-only to the ignored experiment manifest after `/models` and a tool-call check.
-The runner stops if that inventory changes.
+Keep `.env.uni-gpu.local` ignored. It contains the private endpoint URL, key,
+and optional requested model. Never paste those values into tracked files,
+logs, PDFs, or public issues. The exact served model ID is stored only in an
+ignored local manifest. Model identity, proxy alias, image IDs, dataset,
+calibration, and rubric versions must match on resume.
 
-Build and gate the local images:
-
-```powershell
-docker build -f docker/phase1.Dockerfile -t indic-harness-phase1:2026-09-21 .
-py -3.14 -m scripts.prepare_phase1 --source ..\harness-bench
-py -3.14 -m scripts.provision_phase1_runtime
-py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.pilot-v12.yaml --source ..\harness-bench
-```
-
-The `harness-bench` checkout is read-only reference input; the preparation
-script copies selected tasks into ignored `data/phase1/tasks/`.
-
-Before the pilot, `scripts.provision_phase1_runtime.py` builds and records the
-official stable NanoBot `v0.3.5`, OpenClaw `v2026.9.5`, and proxy images in the
-ignored runtime manifest, then creates the Docker-internal
-`phase1-agent-net` network. The preflight rejects missing or mismatched image
-IDs and rejects non-internal networks. It does not substitute the old
-host-process wrappers.
-
-For a new Docker engine, the network shape is:
+From the project root, with the reference checkout at `..\harness-bench`:
 
 ```powershell
-docker network create --internal phase1-agent-net
+py -3.14 -m pytest -q
+py -3.14 -m scripts.prepare_phase1 --source ..\harness-bench --selection benchmark/task_selection.v13.yaml --translations benchmark/translations/phase1.v13.yaml --destination data/phase1/tasks-v13 --check-only
+py -3.14 -m scripts.provision_phase1_runtime --config configs/phase1.corrected.pilot-v13.yaml
+py -3.14 -m scripts.calibrate_pilot_budget --config configs/phase1.corrected.pilot-v13.yaml
 ```
 
-The native image entrypoints and their exact stable release versions must be
-recorded by the team when those images are provisioned; this repository does
-not invent or silently substitute a NanoBot/OpenClaw release.
-
-## Pilot and main execution
-
-Run the corrected 45-cell pilot first:
+For a new machine, omit `--check-only` on `prepare_phase1` to build the
+ignored cache once. The provision script builds the shared task-tool image,
+benchmark image, NanoBot v0.3.5 image, OpenClaw v2026.9.5 image, and proxy;
+it creates/checks the internal Docker network and records local image IDs.
+Inspect the calibration result. If it selects 8,192, change
+`generation.max_tokens` from 4,096 to 8,192 in the v13 config **before any
+pilot cell**. If neither probe passes, stop and investigate; do not run the
+pilot with an untested limit.
 
 ```powershell
-py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.pilot-v12.yaml --source ..\harness-bench
-py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot-v12.yaml --resume
-py -3.14 -m runner.cli judge --config configs/phase1.corrected.pilot-v12.yaml --rerun
-py -3.14 -m runner.cli corrected-report --config configs/phase1.corrected.pilot-v12.yaml --output data/phase1/corrected/pilot-v12/provisional_report.md
+py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.pilot-v13.yaml --source ..\harness-bench
+py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot-v13.yaml --max-cells 9
+py -3.14 -m runner.cli judge --config configs/phase1.corrected.pilot-v13.yaml
+# Inspect the nine 001-file conditions before resuming the other 36 cells.
+py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot-v13.yaml --resume
+py -3.14 -m runner.cli judge --config configs/phase1.corrected.pilot-v13.yaml
+py -3.14 -m runner.cli corrected-report --config configs/phase1.corrected.pilot-v13.yaml --output data/phase1/corrected/pilot-v13/provisional_report.md
+py -3.14 scripts/export_run_index.py --database data/phase1/corrected/pilot-v13/runs.sqlite --output data/phase1/corrected/pilot-v13/run-index.csv --experiment-id phase1_corrected_pilot_v13
 ```
 
-Inspect all 45 pilot cell traces and grades. If a translation or environment defect is
-found, freeze a new dataset/config version; do not rewrite the meaning of old
-runs.
+`runner.cli run` invokes the same preflight before writing cells. The gate
+checks 24 pinned source hashes, 72 variants, the pristine `016` and `050`
+oracle hashes, all image IDs, shared task tools, native startup, internal-only
+network and denied direct internet, proxy tool call and trace, served-model
+identity, and frozen calibration. Any failed gate stops execution.
 
-The main matrix is intentionally deferred for this project milestone. When it
-is authorized later, run it only after a new protocol decision and a fresh
-preflight:
+Pilot acceptance requires exactly 45 completed, oracle-gradable cells, no
+unresolved infrastructure errors, intact proxy traces/workspace archives, and
+45 valid process judgments. Inspect every grade and blinded representative
+traces before interpreting scores. A correction to prompts, runtime, or scoring
+gets a **new version**; do not edit completed records. The prior 216-cell
+experiment and v12 pilot remain readable but are superseded for inference.
 
-```powershell
-py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.research.yaml --source ..\harness-bench
-py -3.14 -m runner.cli run --config configs/phase1.corrected.research.yaml --resume
-py -3.14 -m runner.cli judge --config configs/phase1.corrected.research.yaml
-py -3.14 -m runner.cli corrected-report --config configs/phase1.corrected.research.yaml --output data/phase1/corrected/provisional_report.md
-```
-
-The main run is complete only when the database has exactly 648 completed,
-oracle-gradable cells, zero pending or infrastructure-error cells, and 648
-valid process judgments for the paper-style diagnostic tables. A low outcome
-score is a result; a missing cell, changed model identity, broken grader, or
-invalid judge response is not.
-
-## Logs, provenance, and review
-
-Ignored experiment storage contains the SQLite database, one JSONL trace and
-one result JSON per stable cell, the local run manifest, workspace hashes, and
-the provisional report. The SQLite `attempt` table retains endpoint retries;
-`event` records tool arguments/results, model-call usage when supplied, failed
-tool results, and malformed tool-call errors. Private chain-of-thought is never
-collected.
-
-Create a convenient secret-free index of all per-cell logs with:
-
-```powershell
-py -3.14 scripts/export_run_index.py --database data/phase1/corrected/pilot-v12/runs.sqlite --output data/phase1/corrected/pilot-v12/run-index.csv --experiment-id phase1_corrected_pilot_v12
-```
-
-This writes the ignored pilot run index; the `cell_id`
-column maps each matrix condition to its JSONL trace and result JSON.
-
-Export the translation checklist for team review:
-
-```powershell
-py -3.14 -m scripts.review_translations export --output data/phase1/translation_review_checklist.csv
-```
-
-Later approvals update review metadata only and do not regenerate prepared
-tasks or alter past run records:
-
-```powershell
-py -3.14 -m scripts.review_translations mark --task-id 001-file --language hindi --status approved --reviewer name
-```
-
-Use `analysis/corrected.py` and the generated JSON report for task-balanced
-continuous completion, paired language deltas within each harness, task-cluster
-bootstrap intervals, process/security components, usage, timing, tool failures,
-and error-conditioned recovery. Infrastructure-error cells and invalid grades
-are excluded from model outcomes, and causal failure-stage claims wait for
-human annotation.
-
-Build the research-facing PDF from the completed local database with:
-
-```powershell
-py -3.14 scripts/build_corrected_pdf.py --report data/phase1/corrected/pilot-v12/provisional_report.json --output data/phase1/corrected/pilot-v12/provisional_report.pdf
-```
-
-The corrective pilot PDF and raw SQLite/traces/results remain ignored local
-artifacts. The earlier tracked findings PDF is marked superseded by the
-corrective protocol and must not be used as the Phase I headline result. The
-current pilot report is provisional because the Hindi and Hinglish translations
-remain unreviewed.
+The local SQLite, JSONL, archives, provisional report, and PDF remain ignored.
+The report's trace index links each cell to its artifacts. Low oracle scores
+are possible research results; missing grades, truncated logs, changed model
+identity, or invalid judge output are infrastructure failures. Do not claim
+language causality or equivalence from this pilot. Translation review is still
+required before any definitive Indic-language conclusion.

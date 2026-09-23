@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 from agents.base import AgentAdapter, AgentRequest, AgentResponse
@@ -57,8 +58,49 @@ class ReactAgent:
         failed_tool_calls = 0
         model_calls = 0
         initial_prompt_tokens: int | None = None
+        truncation_retries = 0
+        task_deadline = monotonic() + (request.command_timeout_seconds or request.max_steps)
+
+        def timed_out_response() -> AgentResponse:
+            events.append({"step": model_calls, "event_type": "agent_timeout"})
+            return AgentResponse(
+                completed=False,
+                text=response_text,
+                usage={
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": input_tokens + output_tokens
+                    if input_tokens is not None and output_tokens is not None else None,
+                },
+                metadata={
+                    "stop_reason": "task_timeout", "model_calls": model_calls,
+                    "initial_prompt_tokens": initial_prompt_tokens,
+                    "tool_calls": tool_calls, "failed_tool_calls": failed_tool_calls,
+                    "events": events,
+                },
+            )
+
+        def prepare_shorter_retry() -> None:
+            nonlocal messages, truncation_retries
+            truncation_retries += 1
+            tail = list(messages[2:][-12:])
+            while tail and tail[0].get("role") == "tool":
+                tail.pop(0)
+            messages = [messages[0], messages[1], *tail]
+            messages.append({
+                "role": "user",
+                "content": (
+                    "The previous model response reached the generation limit. "
+                    "Continue the task using short, valid tool calls. Split long files "
+                    "or scripts into small pieces and verify each written artifact."
+                ),
+            })
+            events.append({"step": model_calls, "event_type": "generation_limit_recovery"})
 
         for step in range(request.max_steps):
+            remaining = task_deadline - monotonic()
+            if remaining <= 0:
+                return timed_out_response()
             model_calls += 1
             try:
                 completion = self.client.chat.completions.create(
@@ -68,8 +110,11 @@ class ReactAgent:
                     temperature=request.temperature,
                     top_p=request.top_p,
                     max_tokens=request.max_tokens,
+                    timeout=remaining,
                 )
             except Exception as exc:
+                if monotonic() >= task_deadline:
+                    return timed_out_response()
                 events.append({
                     "step": step + 1,
                     "event_type": "model_error",
@@ -140,6 +185,9 @@ class ReactAgent:
 
             if not message_tool_calls:
                 events.append(model_event)
+                if finish_reason == "length" and truncation_retries < 1:
+                    prepare_shorter_retry()
+                    continue
                 return AgentResponse(
                     # A response cut off at the per-call generation budget is
                     # a valid, gradable model stop.  Do not resend the same
@@ -167,6 +215,7 @@ class ReactAgent:
                     },
                 )
 
+            message_start = len(messages)
             messages.append(
                 {
                     "role": "assistant",
@@ -186,6 +235,10 @@ class ReactAgent:
             )
 
             for call in message_tool_calls:
+                remaining = task_deadline - monotonic()
+                if remaining <= 0:
+                    return timed_out_response()
+                tools.timeout_seconds = max(1, int(remaining))
                 tool_calls += 1
                 tool_name = call.function.name
                 raw_arguments = call.function.arguments
@@ -232,6 +285,14 @@ class ReactAgent:
             events.append(model_event)
 
             if finish_reason == "length":
+                if truncation_retries < 1:
+                    # A truncated JSON tool call cannot be replayed as a
+                    # valid assistant/tool exchange on the next model call.
+                    if any(event.get("step") == step + 1 and event.get("result", {}).get("type") == "JSONDecodeError"
+                           for event in events if event.get("event_type") == "tool_call"):
+                        del messages[message_start:]
+                    prepare_shorter_retry()
+                    continue
                 # The final tool call is valid and has been executed above.
                 # Stop here rather than issuing a continuation that can push
                 # the accumulated tool transcript beyond the served model's
@@ -258,6 +319,7 @@ class ReactAgent:
                         "events": events,
                     },
                 )
+            truncation_retries = 0
 
         return AgentResponse(
             completed=False,

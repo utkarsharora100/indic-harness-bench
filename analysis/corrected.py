@@ -37,6 +37,16 @@ def task_balanced_outcome(rows: list[dict[str, Any]]) -> dict[str, float]:
     return task_balanced_metric(rows, "outcome_score", "grade_status")
 
 
+def task_balanced_lift(rows: list[dict[str, Any]], pristine: dict[str, float]) -> dict[str, float]:
+    """Report improvement over each task's untouched post-hook workspace."""
+    scores = task_condition_scores(rows)
+    grouped: dict[str, list[float]] = defaultdict(list)
+    for (task_id, agent, language), score in scores.items():
+        if task_id in pristine:
+            grouped[f"{agent}:{language}"].append(score - pristine[task_id])
+    return {condition: mean(values) for condition, values in sorted(grouped.items())}
+
+
 def task_balanced_metric(
     rows: list[dict[str, Any]],
     metric: str,
@@ -149,8 +159,10 @@ def harness_interactions(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def trace_links(database: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     result_root = database.parent / "results"
-    return [
-        {
+    links = []
+    for row in rows:
+        metadata = json.loads(row.get("metadata_json") or "{}")
+        links.append({
             "cell_id": row.get("cell_id") or row["run_id"],
             "task_id": row["task_id"],
             "language": row["language"],
@@ -158,9 +170,12 @@ def trace_links(database: Path, rows: list[dict[str, Any]]) -> list[dict[str, An
             "repetition": row.get("repetition"),
             "trace": row.get("trace_path"),
             "result": str(result_root / f"{row.get('cell_id') or row['run_id']}.json"),
-        }
-        for row in rows
-    ]
+            "workspace_archive": metadata.get("workspace_archive"),
+            "trace_complete": metadata.get("trace_complete"),
+            "agent_stop_reason": metadata.get("agent_stop_reason"),
+            "last_model_finish_reason": metadata.get("last_model_finish_reason"),
+        })
+    return links
 
 
 def usage_summary(rows: list[dict[str, Any]]) -> dict[str, dict[str, float | int | None]]:

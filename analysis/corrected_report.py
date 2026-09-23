@@ -13,6 +13,7 @@ from analysis.corrected import (
     paired_outcome_deltas,
     score_difference_distribution,
     task_balanced_outcome,
+    task_balanced_lift,
     task_balanced_metric,
     task_condition_scores,
     trace_links,
@@ -20,8 +21,14 @@ from analysis.corrected import (
 )
 
 
-def build_corrected_report(database: Path, output: Path, experiment_id: str) -> dict[str, Any]:
+def build_corrected_report(database: Path, output: Path, experiment_id: str,
+                           pristine_oracle_scores: dict[str, float] | None = None) -> dict[str, Any]:
     rows = load_corrected_rows(database, experiment_id)
+    links = trace_links(database, rows)
+    stop_reasons: dict[str, int] = {}
+    for link in links:
+        key = f"{link['agent']}:{link['language']}:{link.get('agent_stop_reason') or 'unknown'}"
+        stop_reasons[key] = stop_reasons.get(key, 0) + 1
     task_count = len({row["task_id"] for row in rows})
     repetition_count = len({row.get("repetition") for row in rows}) or 1
     paper_style = task_balanced_metric(rows, "combined_score", "process_status")
@@ -81,6 +88,16 @@ def build_corrected_report(database: Path, output: Path, experiment_id: str) -> 
             "statuses": status_counts,
         },
         "task_balanced_outcome": task_balanced_outcome(rows),
+        "pristine_oracle_scores": pristine_oracle_scores,
+        "task_balanced_lift_over_pristine": (
+            task_balanced_lift(rows, pristine_oracle_scores)
+            if pristine_oracle_scores is not None else None
+        ),
+        "perfect_completion": {
+            key: {"count": sum(1 for row in rows if f"{row['agent']}:{row['language']}" == key and row.get("grade_status") == "completed" and row.get("outcome_score") == 1.0),
+                  "denominator": sum(1 for row in rows if f"{row['agent']}:{row['language']}" == key and row.get("grade_status") == "completed")}
+            for key in sorted({f"{row['agent']}:{row['language']}" for row in rows})
+        },
         "paper_style_diagnostic": paper_style,
         "task_balanced_process_dimensions": process_dimensions,
         "task_scores": task_scores,
@@ -91,12 +108,19 @@ def build_corrected_report(database: Path, output: Path, experiment_id: str) -> 
         "paired_binary_outcomes": paired_outcome_categories(rows),
         "error_conditioned_recovery": error_conditioned_recovery(database, rows),
         "usage_summary": usage_summary(rows),
-        "trace_links": trace_links(database, rows),
+        "trace_links": links,
+        "agent_stop_reasons": stop_reasons,
+        "artifact_integrity": {
+            "missing_traces": sum(not link.get("trace") or not Path(link["trace"]).is_file() for link in links),
+            "missing_workspace_archives": sum(not link.get("workspace_archive") or not Path(link["workspace_archive"]).is_file() for link in links),
+            "incomplete_trace_flags": sum(link.get("trace_complete") is not True for link in links),
+        },
         "notes": [
             "Hindi and Hinglish translations are unreviewed; findings are provisional.",
             "The same university model is used for agent calls and process judging; process scores are diagnostic, not independent validation.",
             "The 24 tasks are a fixed purposive subset of Harness-Bench and are not the paper's 106-task leaderboard.",
             "Repeated temperature-zero attempts are fresh executions but are not assumed to be independent random draws.",
+            "The five-task pilot is diagnostic and too small for population-level language claims.",
         ],
     }
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -124,6 +148,21 @@ def build_corrected_report(database: Path, output: Path, experiment_id: str) -> 
     ]
     for key, value in sorted(report["task_balanced_outcome"].items()):
         lines.append(f"| {key} | {value:.4f} |")
+    if report["task_balanced_lift_over_pristine"] is not None:
+        lines.extend(["", "## Improvement over pristine workspace (secondary)", "",
+                      "Some oracle checks award points before the agent acts. This descriptive lift subtracts each task's untouched post-hook baseline; it can be negative if the agent damages a valid fixture.",
+                      "", "| Harness/language | Mean score lift |", "|---|---:|"])
+        for key, value in sorted(report["task_balanced_lift_over_pristine"].items()):
+            lines.append(f"| {key} | {value:.4f} |")
+    lines.extend(["", "## Perfect completion (secondary)", "", "| Harness/language | Perfect cells | Graded cells |", "|---|---:|---:|"])
+    for key, value in sorted(report["perfect_completion"].items()):
+        lines.append(f"| {key} | {value['count']} | {value['denominator']} |")
+    lines.extend(["", "## Agent stop reasons and artifact integrity", "",
+                  "| Harness/language/stop reason | Cells |", "|---|---:|"])
+    for key, value in sorted(report["agent_stop_reasons"].items()):
+        lines.append(f"| {key} | {value} |")
+    integrity = report["artifact_integrity"]
+    lines.extend(["", f"Missing traces: {integrity['missing_traces']}; missing workspace archives: {integrity['missing_workspace_archives']}; incomplete trace flags: {integrity['incomplete_trace_flags']}."])
     lines.extend(["", "## Task-balanced process/security diagnostics", "", "| Harness/language | Tool use | Consistency | Robustness | Security | Process | Combined |", "|---|---:|---:|---:|---:|---:|---:|"])
     condition_keys = sorted(report["task_balanced_outcome"])
     dimensions = report["task_balanced_process_dimensions"]
@@ -134,7 +173,7 @@ def build_corrected_report(database: Path, output: Path, experiment_id: str) -> 
     lines.extend(["", "## Paired Hindi/Hinglish deltas against English", "", "| Harness | Hindi − English | Hinglish − English |", "|---|---:|---:|"])
     for harness, values in sorted(report["paired_oracle_deltas"].items()):
         lines.append(f"| {harness} | {values.get('hindi', float('nan')):.4f} | {values.get('hinglish', float('nan')):.4f} |")
-    lines.extend(["", "## 95% task-cluster bootstrap intervals for paired oracle deltas", "", "| Harness/language contrast | Lower | Upper |", "|---|---:|---:|"])
+    lines.extend(["", "## Exploratory 95% task-cluster bootstrap intervals for paired oracle deltas", "", "Only five purposively selected tasks contribute to these intervals; they do not support population-level claims.", "", "| Harness/language contrast | Lower | Upper |", "|---|---:|---:|"])
     for harness, values in sorted(report["paired_oracle_bootstrap_95"].items()):
         for language, interval in sorted(values.items()):
             lines.append(f"| {harness}: {language} − English | {interval['lower']:.4f} | {interval['upper']:.4f} |")

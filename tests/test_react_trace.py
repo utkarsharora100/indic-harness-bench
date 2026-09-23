@@ -81,7 +81,7 @@ def test_react_records_tool_calls(tmp_path: Path):
     assert result.metadata["events"][0]["tool"] == "read_file"
 
 
-def test_react_stops_after_truncated_tool_call_without_continuation(tmp_path: Path):
+def test_react_retries_truncated_tool_call_once_then_stops(tmp_path: Path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     (workspace / "app.py").write_text("print('ok')\n", encoding="utf-8")
@@ -124,5 +124,26 @@ def test_react_stops_after_truncated_tool_call_without_continuation(tmp_path: Pa
 
     assert not result.completed
     assert result.metadata["stop_reason"] == "max_tokens"
-    assert result.metadata["tool_calls"] == 1
-    assert completions.calls == 1
+    assert result.metadata["tool_calls"] == 2
+    assert completions.calls == 2
+    assert sum(event["event_type"] == "generation_limit_recovery" for event in result.metadata["events"]) == 1
+
+
+def test_react_honors_task_deadline_before_call(tmp_path: Path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    agent = object.__new__(ReactAgent)
+    completions = FakeCompletions()
+    agent.client = type("Client", (), {"chat": type("Chat", (), {"completions": completions})()})()
+    times = iter((0.0, 2.0))
+    monkeypatch.setattr("agents.react.monotonic", lambda: next(times))
+    from agents.base import AgentRequest
+
+    result = agent.run(AgentRequest(
+        instruction="Read app.py.", workspace=str(workspace), system_prompt="Use tools.",
+        model="test", temperature=0.0, top_p=1.0, max_tokens=100,
+        max_steps=3, command_timeout_seconds=1,
+    ))
+    assert not result.completed
+    assert result.metadata["stop_reason"] == "task_timeout"
+    assert completions.calls == 0

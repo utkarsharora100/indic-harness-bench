@@ -1,4 +1,5 @@
-FROM python:3.12-slim
+ARG TASK_TOOLS_IMAGE=indic-harness-task-tools:pilot-v13
+FROM ${TASK_TOOLS_IMAGE}
 
 ARG NANOBOT_VERSION=0.3.5
 LABEL org.opencontainers.image.title="Indic Harness Bench NanoBot runtime"
@@ -13,10 +14,6 @@ ENV NANOBOT_WORKSPACE=/workspace
 
 WORKDIR /workspace
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git sqlite3 zip unzip coreutils \
-    && rm -rf /var/lib/apt/lists/* \
-    && python -m pip install --no-cache-dir --upgrade pip \
-    && python -m pip install --no-cache-dir "nanobot-ai==${NANOBOT_VERSION}"
+RUN python -m pip install --no-cache-dir "nanobot-ai==${NANOBOT_VERSION}"
 
 CMD ["sleep", "infinity"]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+import tarfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -302,6 +303,7 @@ class ExperimentRunner:
         final_response: AgentResponse | None = None
         final_grade: GradeResult | None = None
         final_workspace_hash: str | None = None
+        final_workspace_archive: str | None = None
         final_agent_time: float | None = None
         final_error: Exception | None = None
         final_status = "infrastructure_error"
@@ -326,13 +328,15 @@ class ExperimentRunner:
                 )
             )
             try:
-                response, grade, attempt_trace, workspace_hash, agent_time = self._execute_attempt(
-                    cell, model_config, attempt_id
+                attempt_trace: list[dict[str, Any]] = []
+                response, grade, attempt_trace, workspace_hash, agent_time, archive_path = self._execute_attempt(
+                    cell, model_config, attempt_id, attempt_trace
                 )
                 trace.extend(attempt_trace)
                 final_response = response
                 final_grade = grade
                 final_workspace_hash = workspace_hash
+                final_workspace_archive = archive_path
                 final_agent_time = agent_time
                 final_status = "completed"
                 self.store.finish_attempt(
@@ -344,6 +348,7 @@ class ExperimentRunner:
                 )
                 break
             except Exception as exc:
+                trace.extend(attempt_trace)
                 final_error = exc
                 error_text = redact(str(exc), self._redaction_secrets(model_config))
                 error_event = self._event(
@@ -365,7 +370,7 @@ class ExperimentRunner:
                 if not transient or retry_index >= max_retries:
                     break
             finally:
-                self._append_trace(cell.cell_id, trace)
+                self._append_trace(cell.cell_id, trace, model_config)
                 self.store.commit()
 
         elapsed = monotonic() - overall_started
@@ -385,7 +390,7 @@ class ExperimentRunner:
                 cell.cell_id,
                 "task_grader",
                 success,
-                json.dumps(grade_payload, ensure_ascii=False),
+                json.dumps(redact(grade_payload, self._redaction_secrets(model_config)), ensure_ascii=False),
                 score=final_grade.outcome_score if final_grade else None,
                 status="completed" if final_grade and not final_grade.infrastructure_error else "invalid",
             )
@@ -418,6 +423,11 @@ class ExperimentRunner:
                 if final_error
                 else None,
                 "outcome_score": final_grade.outcome_score if final_grade else None,
+                "workspace_archive": final_workspace_archive,
+                "agent_completed": final_response.completed if final_response else None,
+                "agent_stop_reason": metadata.get("stop_reason"),
+                "last_model_finish_reason": metadata.get("last_model_finish_reason"),
+                "trace_complete": final_status == "completed",
                 "grade_status": (
                     "completed"
                     if final_grade and not final_grade.infrastructure_error
@@ -425,7 +435,7 @@ class ExperimentRunner:
                 ),
             },
         )
-        self._append_trace(cell.cell_id, trace)
+        self._append_trace(cell.cell_id, trace, model_config)
         result = {
             "run_id": cell.cell_id,
             "cell_id": cell.cell_id,
@@ -438,6 +448,7 @@ class ExperimentRunner:
             "success": success if final_status == "completed" else None,
             "execution_time": final_agent_time,
             "end_to_end_time": elapsed,
+            "workspace_archive": final_workspace_archive,
         }
         result_path = self.config.root / self.config.storage["results_dir"] / f"{cell.cell_id}.json"
         result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -449,7 +460,8 @@ class ExperimentRunner:
         cell: Cell,
         model_config: dict[str, Any],
         attempt_id: str,
-    ) -> tuple[AgentResponse, GradeResult, list[dict[str, Any]], str, float]:
+        trace_sink: list[dict[str, Any]] | None = None,
+    ) -> tuple[AgentResponse, GradeResult, list[dict[str, Any]], str, float, str]:
         task = cell.task
         task_root = self.config.task_root / task.task_id
         source_workspace: Path | None = None
@@ -458,7 +470,8 @@ class ExperimentRunner:
             fixtures = task_root / task.upstream.source_dir / task.upstream.fixtures_dir
         else:
             source_workspace = task_root / task.environment.workspace
-        trace: list[dict[str, Any]] = [
+        trace: list[dict[str, Any]] = trace_sink if trace_sink is not None else []
+        trace.append(
             self._event(
                 cell.cell_id,
                 0,
@@ -472,7 +485,7 @@ class ExperimentRunner:
                     "attempt_id": attempt_id,
                 },
             )
-        ]
+        )
         secrets = self._redaction_secrets(model_config)
         with WorkspaceSandbox(
             source_workspace=source_workspace,
@@ -491,11 +504,16 @@ class ExperimentRunner:
                     sandbox.workspace,
                     task.upstream.hooks_module,
                 )
-                runtime_env = {
-                    key: str(value)
-                    for key, value in runtime_state.items()
-                    if isinstance(value, (str, int, float))
-                }
+                runtime_env = {}
+                for key, value in runtime_state.items():
+                    if not isinstance(value, (str, int, float)):
+                        continue
+                    rendered_value = str(value)
+                    if self.config.sandbox["mode"] == "docker":
+                        path_value = Path(rendered_value)
+                        if path_value.is_absolute() and path_value.is_relative_to(sandbox.workspace):
+                            rendered_value = "/workspace/" + path_value.relative_to(sandbox.workspace).as_posix()
+                    runtime_env[key] = rendered_value
                 trace.append(
                     self._event(
                         cell.cell_id,
@@ -564,6 +582,7 @@ class ExperimentRunner:
             )
             agent_started = monotonic()
             proxy = self.proxies.get(cell.model) if cell.agent == "react" else None
+            sidecar_snapshot: dict[str, Any] | None = None
             if proxy is not None:
                 proxy.begin_cell(cell.cell_id)
             try:
@@ -572,17 +591,50 @@ class ExperimentRunner:
                 finally:
                     agent.close()
                 agent_time = monotonic() - agent_started
+                if sidecar is not None:
+                    try:
+                        sidecar_snapshot = sidecar.seal()
+                    except Exception as exc:
+                        try:
+                            sidecar_snapshot = sidecar.snapshot()
+                        except Exception:
+                            sidecar_snapshot = None
+                        trace.append(self._event(cell.cell_id, 0, "agent_result", {
+                            "attempt_id": attempt_id,
+                            "completed": response.completed,
+                            "usage": response.usage,
+                            "metadata": {key: value for key, value in response.metadata.items()
+                                         if key != "events"},
+                        }))
+                        trace.append(self._event(cell.cell_id, 0, "proxy_trace_error", {
+                            "attempt_id": attempt_id,
+                            "agent_completed": response.completed,
+                            "agent_stop_reason": response.metadata.get("stop_reason"),
+                            "error_type": type(exc).__name__,
+                        }))
+                        raise
+                    final_reasons = [
+                        choice.get("finish_reason")
+                        for event in sidecar_snapshot.get("events", [])
+                        if event.get("event_type") == "proxy_response"
+                        for choice in (event.get("data", {}).get("choices") or [])
+                        if isinstance(choice, dict) and choice.get("finish_reason")
+                    ]
+                    if final_reasons and final_reasons[-1] == "length":
+                        response.completed = False
+                        response.metadata["stop_reason"] = "max_tokens"
+                    response.metadata["last_model_finish_reason"] = final_reasons[-1] if final_reasons else None
                 active_proxy = proxy or sidecar
                 if active_proxy is not None:
                     usage = (
                         proxy.cell_usage()
                         if proxy is not None
-                        else sidecar.snapshot().get("usage", {})
+                        else (sidecar_snapshot or {}).get("usage", {})
                     )
                     if any(isinstance(value, int) and value > 0 for value in usage.values()):
                         response.usage = usage
                     response.metadata["proxy_calls"] = (
-                        proxy._cell_calls if proxy is not None else sidecar.snapshot().get("calls", 0)
+                        proxy._cell_calls if proxy is not None else (sidecar_snapshot or {}).get("calls", 0)
                     )
                 if cell.agent != "react":
                     response.metadata["tool_calls"] = int(response.metadata.get("native_tool_calls", 0) or 0)
@@ -648,6 +700,11 @@ class ExperimentRunner:
                         )
                     )
                 final_workspace_hash = workspace_sha256(sandbox.workspace)
+                archive_dir = self.config.root / self.config.storage["results_dir"] / "workspaces"
+                archive_dir.mkdir(parents=True, exist_ok=True)
+                archive_path = archive_dir / f"{attempt_id}.tar.gz"
+                with tarfile.open(archive_path, "w:gz") as archive:
+                    archive.add(sandbox.workspace, arcname="workspace", recursive=True)
                 if task.upstream is not None:
                     grade = run_upstream_oracle(
                         task_root / task.upstream.source_dir,
@@ -674,15 +731,16 @@ class ExperimentRunner:
                         task.limits.timeout_seconds,
                         command_runner=command_runner,
                     )
-                return response, grade, trace, final_workspace_hash, agent_time
+                return response, grade, trace, final_workspace_hash, agent_time, str(archive_path)
             finally:
                 if proxy is not None:
                     for proxy_event in proxy.end_cell():
+                        observable = redact(proxy_event.get("data", {}), secrets)
                         trace_event = self._event(
                             cell.cell_id,
                             0,
                             proxy_event["event_type"],
-                            proxy_event.get("data", {}),
+                            observable,
                         )
                         trace_event["timestamp"] = proxy_event.get(
                             "timestamp", trace_event["timestamp"]
@@ -694,16 +752,16 @@ class ExperimentRunner:
                             step=0,
                             event_type=proxy_event["event_type"],
                             timestamp=trace_event["timestamp"],
-                            result=proxy_event.get("data", {}),
+                            result=observable,
                         )
                 if sidecar is not None:
-                    sidecar_snapshot = sidecar.snapshot()
-                    for sidecar_event in sidecar_snapshot.get("events", []):
+                    for sidecar_event in (sidecar_snapshot or {}).get("events", []):
+                        observable = redact(sidecar_event.get("data", {}), secrets)
                         trace_event = self._event(
                             cell.cell_id,
                             0,
                             sidecar_event.get("event_type", "proxy_event"),
-                            sidecar_event.get("data", {}),
+                            observable,
                         )
                         trace_event["timestamp"] = sidecar_event.get(
                             "timestamp", trace_event["timestamp"]
@@ -715,7 +773,7 @@ class ExperimentRunner:
                             step=0,
                             event_type=trace_event["event_type"],
                             timestamp=trace_event["timestamp"],
-                            result=sidecar_event.get("data", {}),
+                            result=observable,
                         )
                     sidecar.close()
                 if task.upstream is not None:
@@ -754,19 +812,58 @@ class ExperimentRunner:
         data = json.loads(json.dumps(self.config.data, ensure_ascii=False))
         if isinstance(data.get("inference"), dict):
             data["inference"].pop("api_key", None)
+        if self.config.experiment.get("version") == "corrected-v13":
+            paths = {
+                "dataset": self.config.experiment["dataset_manifest"],
+                "translations": self.config.experiment["translations_manifest"],
+                "agents": self.config.experiment["agents_manifest"],
+                "model": self.config.inference["manifest"],
+                "runtime": self.config.inference["runtime_manifest"],
+                "calibration": self.config.inference["calibration_manifest"],
+                "runner": "runner/runner.py",
+                "react": "agents/react.py",
+                "native": "agents/container.py",
+                "proxy": "runner/proxy.py",
+                "sidecar": "scripts/proxy_sidecar.py",
+                "preflight": "runner/preflight.py",
+                "calibration_code": "scripts/calibrate_pilot_budget.py",
+                "preparation_code": "scripts/prepare_phase1.py",
+                "grader": "runner/grader.py",
+                "judge": "runner/judge.py",
+                "upstream": "benchmark/upstream.py",
+            }
+            data["frozen_sha256"] = {
+                name: hashlib.sha256((self.config.root / path).read_bytes()).hexdigest()
+                for name, path in paths.items()
+            }
         return data
 
-    @staticmethod
-    def _redaction_secrets(model_config: dict[str, Any]) -> tuple[str, ...]:
+    def assert_experiment_identity(self) -> None:
+        """Reject scoring or resuming under changed v13 runtime provenance."""
+        row = self.store.connection.execute(
+            "SELECT config_json, manifest_json FROM experiment WHERE experiment_id = ?",
+            (self.config.experiment_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("No completed experiment exists to judge")
+        expected_config = json.dumps(self._safe_config(), ensure_ascii=False, sort_keys=True)
+        expected_manifest = json.dumps(self._experiment_manifest(), ensure_ascii=False, sort_keys=True)
+        if row["config_json"] != expected_config or row["manifest_json"] != expected_manifest:
+            raise ValueError("Experiment dataset, model, image, calibration, or code identity changed")
+
+    def _redaction_secrets(self, model_config: dict[str, Any]) -> tuple[str, ...]:
         values = [model_config.get("api_key"), model_config.get("base_url")]
+        for proxy in self.proxies.values():
+            values.extend((proxy.upstream_key, proxy.upstream_base_url, proxy.resolved_model))
         return tuple(value for value in values if isinstance(value, str) and value)
 
-    def _append_trace(self, cell_id: str, trace: list[dict[str, Any]]) -> None:
+    def _append_trace(self, cell_id: str, trace: list[dict[str, Any]], model_config: dict[str, Any]) -> None:
         path = self.config.root / self.config.storage["traces_dir"] / f"{cell_id}.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
+        secrets = self._redaction_secrets(model_config)
         with path.open("w", encoding="utf-8") as handle:
             for event in trace:
-                handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+                handle.write(json.dumps(redact(event, secrets), ensure_ascii=False) + "\n")
 
     @staticmethod
     def _event(run_id: str, step: int, event_type: str, data: dict[str, Any]) -> dict[str, Any]:

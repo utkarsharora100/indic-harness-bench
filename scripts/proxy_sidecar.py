@@ -36,13 +36,21 @@ def main() -> None:
     ).start()
     proxy.begin_cell(required("PHASE1_CELL_ID"))
     output = trace_dir / "proxy.json"
+    temporary = trace_dir / "proxy.json.tmp"
     stop = threading.Event()
+
+    def persist() -> None:
+        with temporary.open("w", encoding="utf-8") as handle:
+            json.dump(proxy.snapshot_cell(), handle, ensure_ascii=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, output)
 
     def write_snapshot() -> None:
         while not stop.is_set():
-            output.write_text(json.dumps(proxy.snapshot_cell(), ensure_ascii=False), encoding="utf-8")
+            persist()
             stop.wait(0.25)
-        output.write_text(json.dumps(proxy.snapshot_cell(), ensure_ascii=False), encoding="utf-8")
+        persist()
 
     writer = threading.Thread(target=write_snapshot, daemon=True)
     writer.start()
