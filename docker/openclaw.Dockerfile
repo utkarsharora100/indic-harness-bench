@@ -1,6 +1,6 @@
+ARG TASK_TOOLS_IMAGE=indic-harness-task-tools:pilot-v13
 FROM node:24.16.0-bookworm-slim AS node-runtime
 
-ARG TASK_TOOLS_IMAGE=indic-harness-task-tools:pilot-v13
 FROM ${TASK_TOOLS_IMAGE}
 
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node

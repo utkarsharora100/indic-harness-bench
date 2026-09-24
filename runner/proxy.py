@@ -280,6 +280,13 @@ class InferenceProxy:
 
     def begin_cell(self, cell_id: str) -> None:
         with self._trace_lock:
+            if self._active_trace is not None:
+                active_id = self._active_trace.get("cell_id", "unknown")
+                raise ModelProxyError(
+                    f"Cannot begin proxy cell {cell_id!r}; cell {active_id!r} is still active"
+                )
+            if not isinstance(cell_id, str) or not cell_id.strip():
+                raise ModelProxyError("Proxy cell ID must be a non-empty string")
             self._active_trace = {"cell_id": cell_id, "events": []}
             self._cell_calls = 0
             self._cell_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
@@ -287,8 +294,18 @@ class InferenceProxy:
     def end_cell(self) -> list[dict[str, Any]]:
         with self._trace_lock:
             active = self._active_trace
+            if active is None:
+                raise ModelProxyError("Cannot end a proxy cell when no cell is active")
+            events = list(active.get("events", []))
             self._active_trace = None
-        return list(active.get("events", [])) if active is not None else []
+        return events
+
+    @property
+    def active_cell_id(self) -> str | None:
+        with self._trace_lock:
+            if self._active_trace is None:
+                return None
+            return str(self._active_trace["cell_id"])
 
     def cell_usage(self) -> dict[str, int | None]:
         with self._trace_lock:
@@ -300,6 +317,7 @@ class InferenceProxy:
         with self._trace_lock:
             events = list((self._active_trace or {}).get("events", []))
             return {
+                "cell_id": (self._active_trace or {}).get("cell_id"),
                 "events": events,
                 "usage": dict(self._cell_usage),
                 "calls": self._cell_calls,
@@ -323,6 +341,15 @@ class InferenceProxy:
             payload["top_p"] = self.top_p
         if payload.get("max_tokens") is None:
             payload["max_tokens"] = self.max_tokens
+        if payload.get("stream") is True:
+            # OpenAI-compatible streaming responses only include the terminal
+            # usage chunk when explicitly requested. Native clients (notably
+            # OpenClaw) otherwise leave token accounting missing.
+            options = payload.get("stream_options")
+            if not isinstance(options, dict):
+                options = {}
+                payload["stream_options"] = options
+            options["include_usage"] = True
 
     @staticmethod
     def _observable_request(payload: dict[str, Any]) -> dict[str, Any]:
@@ -345,6 +372,8 @@ class InferenceProxy:
             "temperature": payload.get("temperature"),
             "top_p": payload.get("top_p"),
             "max_tokens": payload.get("max_tokens"),
+            "stream": payload.get("stream"),
+            "stream_options": payload.get("stream_options"),
         }
 
     @staticmethod
@@ -383,7 +412,34 @@ class InferenceProxy:
             if isinstance(payload, dict):
                 raw_choices = payload.get("choices")
                 if isinstance(raw_choices, list):
-                    choices.extend(raw_choices)
+                    for choice in raw_choices:
+                        if not isinstance(choice, dict):
+                            continue
+                        visible: dict[str, Any] = {
+                            "finish_reason": choice.get("finish_reason"),
+                        }
+                        if "index" in choice:
+                            visible["index"] = choice["index"]
+                        delta = choice.get("delta")
+                        if isinstance(delta, dict):
+                            safe_delta: dict[str, Any] = {}
+                            if delta.get("role") is not None:
+                                safe_delta["role"] = delta["role"]
+                            # Keep observable tool actions, but never capture
+                            # streamed assistant text or reasoning channels.
+                            if isinstance(delta.get("tool_calls"), list):
+                                safe_delta["tool_calls"] = [
+                                    {
+                                        key: call[key]
+                                        for key in ("index", "id", "type", "function")
+                                        if key in call
+                                    }
+                                    for call in delta["tool_calls"]
+                                    if isinstance(call, dict)
+                                ]
+                            if safe_delta:
+                                visible["delta"] = safe_delta
+                        choices.append(visible)
                 if isinstance(payload.get("usage"), dict):
                     usage = payload["usage"]
         return {"choices": choices, "usage": usage, "streamed": True}

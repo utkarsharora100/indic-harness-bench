@@ -1,0 +1,36 @@
+version: outcome-rubric-pilot-v14-v8
+evidence_schema_version: 8
+score_levels:
+  0: absent_or_contradicted
+  1: attempted_with_major_errors
+  2: useful_partial_work
+  3: substantially_correct_minor_omissions
+  4: fully_satisfies_requirement
+tasks:
+  001-file:
+    criteria:
+      - {id: correct_line_count, weight: 0.80, instruction: "Compare the submitted line count with the reference."}
+      - {id: input_preserved, weight: 0.20, instruction: "Compare pinned and submitted input hashes."}
+  016-code-repair-pytest:
+    criteria:
+      - {id: working_repair, weight: 0.60, instruction: "Assess submitted repair and independent test result against the stated behavior."}
+      - {id: constraints_and_test_integrity, weight: 0.25, instruction: "Assess code constraints and integrity of the original tests."}
+      - {id: progress_note, weight: 0.15, instruction: "Assess the submitted progress note against required topics."}
+  019-incident-runbook-synthesis:
+    criteria:
+      - {id: incident_report, weight: 0.50, instruction: "Compare report facts, timeline, actions and sources with the reference."}
+      - {id: rollback_plan, weight: 0.20, instruction: "Compare the rollback plan with required safe steps and approvals."}
+      - {id: evidence_matrix, weight: 0.20, instruction: "Compare source traceability with required evidence sources."}
+      - {id: status_update, weight: 0.10, instruction: "Compare impact, status, next steps and update timing."}
+  025-meeting-action-tracker:
+    criteria:
+      - {id: action_table, weight: 0.60, instruction: "Compare each action's required owner, deadline, status, task and source."}
+      - {id: owner_followups, weight: 0.20, instruction: "Compare owner follow-ups and dependencies."}
+      - {id: merge_rationale, weight: 0.20, instruction: "Compare rationale for updates, reassignments, cancellations and dependencies."}
+  050-multitable-join-analysis:
+    criteria:
+      - {id: customer_metrics, weight: 0.50, instruction: "Compare headers, customer set and each customer metric with the reference table."}
+      - {id: region_summary, weight: 0.15, instruction: "Compare each required region summary field."}
+      - {id: reconciliation_audit, weight: 0.20, instruction: "Compare required audit ID lists."}
+      - {id: reconciliation_notes, weight: 0.10, instruction: "Compare the required anomaly and revenue explanations."}
+      - {id: input_preserved, weight: 0.05, instruction: "Compare pinned and submitted input hashes."}

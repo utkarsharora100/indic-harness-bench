@@ -26,6 +26,10 @@ class ExperimentConfig:
         return self.data["experiment"]
 
     @property
+    def is_corrected_phase1(self) -> bool:
+        return str(self.experiment.get("version", "")).startswith("corrected-v")
+
+    @property
     def generation(self) -> dict[str, Any]:
         return self.data["generation"]
 

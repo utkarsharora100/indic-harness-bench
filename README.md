@@ -60,24 +60,28 @@ pytest
 ## Phase I execution
 
 The source checkout `../harness-bench` is read-only reference input. The v12
-pilot is superseded for language inference because Windows checkout conversion
-changed oracle-sensitive fixture bytes. The v13 five-task pilot uses canonical
-Git blobs and a new ignored database; the 648-cell main study is deferred.
-See [the protocol](docs/phase1_protocol.md) for the full gates.
+pilot is superseded because Windows checkout conversion changed oracle-sensitive
+fixture bytes. The v13 smoke is retained as diagnostic data but superseded after
+an audit found that OpenClaw streaming responses omitted usage. The v14 pilot
+uses a separate ignored database, requests streamed usage, and excludes streamed
+assistant/reasoning text from traces. The 648-cell main study is deferred. See
+[the v14 protocol](docs/phase1_protocol_v14.md) for the frozen gates.
 
 ```powershell
-py -3.14 -m scripts.prepare_phase1 --source ..\harness-bench --selection benchmark/task_selection.v13.yaml --translations benchmark/translations/phase1.v13.yaml --destination data/phase1/tasks-v13
-py -3.14 -m scripts.provision_phase1_runtime --config configs/phase1.corrected.pilot-v13.yaml
-py -3.14 -m scripts.calibrate_pilot_budget --config configs/phase1.corrected.pilot-v13.yaml
-py -3.14 -m scripts.preflight_phase1 --config configs/phase1.corrected.pilot-v13.yaml --source ..\harness-bench
-py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot-v13.yaml --resume
-py -3.14 -m runner.cli judge --config configs/phase1.corrected.pilot-v13.yaml
-py -3.14 -m runner.cli corrected-report --config configs/phase1.corrected.pilot-v13.yaml --output data/phase1/corrected/pilot-v13/provisional_report.md
+py -3.14 -m scripts.prepare_phase1 --source ..\harness-bench --selection benchmark/task_selection.v13.yaml --translations benchmark/translations/phase1.v13.yaml --destination data/phase1/tasks-v13 --check-only
+docker build -f docker/proxy.Dockerfile -t indic-harness-proxy:pilot-v14 .
+py -3.14 -m scripts.provision_phase1_runtime --config configs/phase1.corrected.pilot-v14.yaml --skip-build
+py -3.14 -m scripts.calibrate_pilot_budget --config configs/phase1.corrected.pilot-v14.yaml
+py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot-v14.yaml --max-cells 9
+# Inspect the nine 001-file grades and traces before proceeding.
+py -3.14 -m runner.cli run --config configs/phase1.corrected.pilot-v14.yaml --resume
+py -3.14 -m runner.cli judge --config configs/phase1.corrected.pilot-v14.yaml
+py -3.14 -m runner.cli corrected-report --config configs/phase1.corrected.pilot-v14.yaml --output data/phase1/corrected/pilot-v14/provisional_report.md
 ```
 
 Raw databases, traces, model manifests, and provisional reports live under
-ignored `data/phase1/` storage. Corrected runs use separate databases and
-experiment IDs and are never mixed with the old prototype database.
+ignored `data/phase1/` storage. Each corrected version uses its own database
+and experiment ID; v12 and v13 records are never pooled with v14.
 
 ## Harness-Bench import
 

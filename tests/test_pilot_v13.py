@@ -11,7 +11,7 @@ from runner.config import ExperimentConfig
 from runner.preflight import PreflightError, check_calibration
 from runner.proxy_sidecar import ProxySidecar
 from runner.inference import InferenceTransientError
-from runner.runner import ExperimentRunner
+from runner.runner import ExperimentRunner, _first_proxy_prompt_tokens
 from runner.log import RunStore
 from scripts.calibrate_pilot_budget import PROBES
 from scripts.prepare_phase1 import tree_sha256
@@ -42,11 +42,11 @@ def test_canonical_source_bytes_survive_windows_checkout_conversion(tmp_path: Pa
     assert task_blobs(repository, "HEAD", "001-file")["prompt.txt"][0] != (task / "prompt.txt").read_bytes()
 
 
-def _config(tmp_path: Path) -> ExperimentConfig:
+def _config(tmp_path: Path, version: str = "corrected-v13") -> ExperimentConfig:
     path = tmp_path / "configs" / "pilot.yaml"
     path.parent.mkdir()
     return ExperimentConfig(path, {
-        "experiment": {"name": "pilot-v13", "version": "corrected-v13"},
+        "experiment": {"name": f"pilot-{version}", "version": version},
         "generation": {"max_tokens": 4096},
         "inference": {
             "calibration_manifest": "data/calibration.json",
@@ -55,8 +55,9 @@ def _config(tmp_path: Path) -> ExperimentConfig:
     })
 
 
-def test_calibration_freezes_cap_model_and_probes(tmp_path: Path) -> None:
-    config = _config(tmp_path)
+@pytest.mark.parametrize("version", ["corrected-v13", "corrected-v14"])
+def test_calibration_freezes_cap_model_and_probes(tmp_path: Path, version: str) -> None:
+    config = _config(tmp_path, version)
     data = tmp_path / "data"
     data.mkdir()
     (data / "model.json").write_text(json.dumps({"resolved_model": "private-id"}), encoding="utf-8")
@@ -121,6 +122,15 @@ def test_trace_index_exposes_workspace_and_stop_reason(tmp_path: Path) -> None:
     assert link["workspace_archive"].endswith("workspace.tar.gz")
     assert link["trace_complete"] is True
     assert link["agent_stop_reason"] == "max_tokens"
+
+
+def test_initial_prompt_usage_uses_first_proxy_response_only() -> None:
+    events = [
+        {"event_type": "proxy_error", "data": {"status": 503}},
+        {"event_type": "proxy_response", "data": {"usage": {"prompt_tokens": 123}}},
+        {"event_type": "proxy_response", "data": {"usage": {"prompt_tokens": 456}}},
+    ]
+    assert _first_proxy_prompt_tokens(events) == 123
 
 
 def test_experiment_resume_rejects_runtime_image_manifest_change(tmp_path: Path) -> None:

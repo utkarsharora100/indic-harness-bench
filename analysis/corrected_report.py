@@ -11,6 +11,7 @@ from analysis.corrected import (
     load_corrected_rows,
     paired_outcome_categories,
     paired_outcome_deltas,
+    paired_task_counts,
     score_difference_distribution,
     task_balanced_outcome,
     task_balanced_lift,
@@ -102,6 +103,7 @@ def build_corrected_report(database: Path, output: Path, experiment_id: str,
         "task_balanced_process_dimensions": process_dimensions,
         "task_scores": task_scores,
         "paired_oracle_deltas": paired_outcome_deltas(rows),
+        "paired_oracle_task_counts": paired_task_counts(rows),
         "paired_oracle_bootstrap_95": bootstrap_paired_deltas(rows),
         "score_difference_distribution": score_difference_distribution(rows),
         "harness_interactions": harness_interactions(rows),
@@ -173,10 +175,10 @@ def build_corrected_report(database: Path, output: Path, experiment_id: str,
     lines.extend(["", "## Paired Hindi/Hinglish deltas against English", "", "| Harness | Hindi − English | Hinglish − English |", "|---|---:|---:|"])
     for harness, values in sorted(report["paired_oracle_deltas"].items()):
         lines.append(f"| {harness} | {values.get('hindi', float('nan')):.4f} | {values.get('hinglish', float('nan')):.4f} |")
-    lines.extend(["", "## Exploratory 95% task-cluster bootstrap intervals for paired oracle deltas", "", "Only five purposively selected tasks contribute to these intervals; they do not support population-level claims.", "", "| Harness/language contrast | Lower | Upper |", "|---|---:|---:|"])
+    lines.extend(["", "## Exploratory 95% task-cluster bootstrap intervals for paired oracle deltas", "", "Only five purposively selected tasks contribute; a missing cell reduces the affected contrast's paired task count. These intervals do not support population-level claims.", "", "| Harness/language contrast | Paired tasks | Lower | Upper |", "|---|---:|---:|---:|"])
     for harness, values in sorted(report["paired_oracle_bootstrap_95"].items()):
         for language, interval in sorted(values.items()):
-            lines.append(f"| {harness}: {language} − English | {interval['lower']:.4f} | {interval['upper']:.4f} |")
+            lines.append(f"| {harness}: {language} − English | {interval['n_tasks']} | {interval['lower']:.4f} | {interval['upper']:.4f} |")
     lines.extend(["", "## Paired binary outcomes", ""])
     for harness, values in sorted(report["paired_binary_outcomes"].items()):
         lines.append(f"### {harness}\n")

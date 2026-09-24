@@ -15,6 +15,15 @@ data/traces/*
 !data/results/.gitkeep
 !data/traces/.gitkeep
 data/phase1/
+/output/pdf/indic_harness_phase1_corrected_pilot_v14.pdf
+/output/pdf/indic_harness_phase1_llm_judged_regrade_v1.pdf
+/output/pdf/indic_harness_phase1_llm_judged_regrade_v2.pdf
+/output/pdf/indic_harness_phase1_llm_judged_regrade_v3.pdf
+/output/pdf/indic_harness_phase1_llm_judged_regrade_v4.pdf
+/output/pdf/indic_harness_phase1_llm_judged_regrade_v5.pdf
+/output/pdf/indic_harness_phase1_llm_judged_regrade_v6.pdf
+/output/pdf/indic_harness_phase1_llm_judged_regrade_v7.pdf
+/output/pdf/indic_harness_phase1_llm_judged_regrade_v8.pdf
 benchmark/translations/phase1.partial.yaml
 
 tmp/

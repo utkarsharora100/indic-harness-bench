@@ -109,6 +109,21 @@ def paired_outcome_deltas(rows: list[dict[str, Any]], *, metric: str = "outcome_
     return by_harness
 
 
+def paired_task_counts(rows: list[dict[str, Any]], *, metric: str = "outcome_score") -> dict[str, dict[str, int]]:
+    """Count complete task pairs separately for each language contrast."""
+    status_field = "grade_status" if metric == "outcome_score" else "process_status"
+    grouped = task_condition_scores(rows, metric, status_field)
+    result: dict[str, dict[str, int]] = {}
+    for agent in sorted({key[1] for key in grouped}):
+        result[agent] = {}
+        for language in ("hindi", "hinglish"):
+            result[agent][language] = sum(
+                (task, agent, "english") in grouped and (task, agent, language) in grouped
+                for task in {key[0] for key in grouped if key[1] == agent}
+            )
+    return result
+
+
 def score_difference_distribution(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     scores = task_condition_scores(rows)
     result: list[dict[str, Any]] = []
@@ -208,7 +223,7 @@ def bootstrap_paired_deltas(
     metric: str = "outcome_score",
     repetitions: int = 20_000,
     seed: int = 1701,
-) -> dict[str, dict[str, dict[str, float]]]:
+) -> dict[str, dict[str, dict[str, float | int]]]:
     """Task-cluster bootstrap of paired language deltas.
 
     The same sampled task indices are used for English, Hindi, and Hinglish;
@@ -224,20 +239,26 @@ def bootstrap_paired_deltas(
         for (task, harness, language), value in scores.items():
             if harness == agent:
                 tasks[task][language] = value
-        eligible = [task for task, values in tasks.items() if all(lang in values for lang in LANGUAGES)]
-        if not eligible:
-            continue
-        samples = {language: [] for language in ("hindi", "hinglish")}
-        for _ in range(repetitions):
-            chosen = [rng.choice(eligible) for _ in eligible]
-            for language in samples:
-                samples[language].append(mean(tasks[task][language] - tasks[task]["english"] for task in chosen))
         result[agent] = {}
-        for language, values in samples.items():
-            values.sort()
+        for language in ("hindi", "hinglish"):
+            # Each estimand uses all tasks with that specific complete pair.
+            # Requiring the third language as well would silently drop valid
+            # task pairs when only one overlay/harness cell is missing.
+            eligible = [
+                task for task, values in tasks.items()
+                if "english" in values and language in values
+            ]
+            if not eligible:
+                continue
+            samples: list[float] = []
+            for _ in range(repetitions):
+                chosen = [rng.choice(eligible) for _ in eligible]
+                samples.append(mean(tasks[task][language] - tasks[task]["english"] for task in chosen))
+            samples.sort()
             result[agent][language] = {
-                "lower": values[int(0.025 * (len(values) - 1))],
-                "upper": values[int(0.975 * (len(values) - 1))],
+                "n_tasks": len(eligible),
+                "lower": samples[int(0.025 * (len(samples) - 1))],
+                "upper": samples[int(0.975 * (len(samples) - 1))],
             }
     return result
 

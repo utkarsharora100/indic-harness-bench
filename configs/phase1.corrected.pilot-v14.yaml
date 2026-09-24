@@ -1,12 +1,11 @@
-# Exploratory five-task pilot after canonical-source and trace repairs.
-# Calibration must set generation.max_tokens to 4096 or 8192 and freeze this
-# file before model cells are started. No v12 cell is eligible for resume.
+# v14 preserves the v13 task and agent images; the proxy now requests streamed
+# usage chunks and excludes streamed assistant/reasoning text from traces.
 experiment:
-  name: phase1_corrected_pilot_v13
+  name: phase1_corrected_pilot_v14
   dataset_manifest: benchmark/task_selection.v13.yaml
   translations_manifest: benchmark/translations/phase1.v13.yaml
   prepared_tasks_root: data/phase1/tasks-v13
-  agents_manifest: configs/agents.pilot-v13.yaml
+  agents_manifest: configs/agents.pilot-v14.yaml
   models_manifest: configs/models.yaml
   seed: 1701
   repetitions: 1
@@ -19,7 +18,7 @@ experiment:
     - 019-incident-runbook-synthesis
   agents: [react, nanobot, openclaw]
   models: [university_gpu]
-  version: corrected-v13
+  version: corrected-v14
 
 generation:
   temperature: 0.0
@@ -36,20 +35,20 @@ inference:
   provider: university_gpu
   env_file: .env.uni-gpu.local
   requested_model_env: INDIC_UNI_GPU_MODEL
-  manifest: data/phase1/corrected/pilot-v13-model-manifest.json
-  runtime_manifest: data/phase1/corrected/pilot-v13-runtime-manifest.json
-  calibration_manifest: data/phase1/corrected/pilot-v13-calibration.json
+  manifest: data/phase1/corrected/pilot-v14-model-manifest.json
+  runtime_manifest: data/phase1/corrected/pilot-v14-runtime-manifest.json
+  calibration_manifest: data/phase1/corrected/pilot-v14-calibration.json
   timeout_seconds: 90
   max_retries: 2
   proxy:
     enabled: true
     public_model: phase1-university-model
     max_calls_per_cell: 40
-    image: indic-harness-proxy:pilot-v13
+    image: indic-harness-proxy:pilot-v14
     egress_network: bridge
 
 storage:
-  experiment_dir: data/phase1/corrected/pilot-v13
-  database: data/phase1/corrected/pilot-v13/runs.sqlite
-  traces_dir: data/phase1/corrected/pilot-v13/traces
-  results_dir: data/phase1/corrected/pilot-v13/results
+  experiment_dir: data/phase1/corrected/pilot-v14
+  database: data/phase1/corrected/pilot-v14/runs.sqlite
+  traces_dir: data/phase1/corrected/pilot-v14/traces
+  results_dir: data/phase1/corrected/pilot-v14/results

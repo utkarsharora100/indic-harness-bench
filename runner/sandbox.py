@@ -172,6 +172,7 @@ class WorkspaceSandbox:
                 volumes={str(grader_workspace): {"bind": "/workspace", "mode": "rw"}},
                 workdir=container_workdir,
                 timeout_seconds=timeout_seconds,
+                max_output_chars=None,
             )
 
     def run_oracle(

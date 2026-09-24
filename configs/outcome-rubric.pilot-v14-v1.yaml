@@ -1,0 +1,69 @@
+version: outcome-rubric-pilot-v14-v1
+score_levels:
+  0: absent_or_contradicted
+  1: attempted_with_major_errors
+  2: useful_partial_work
+  3: substantially_correct_minor_omissions
+  4: fully_satisfies_requirement
+tasks:
+  001-file:
+    criteria:
+      - id: correct_line_count
+        weight: 0.80
+        instruction: The output contains only the correct integer line count from in/input.txt.
+      - id: input_preserved
+        weight: 0.20
+        instruction: The input file is unchanged and no unrelated workspace content is damaged.
+  016-code-repair-pytest:
+    criteria:
+      - id: working_repair
+        weight: 0.60
+        instruction: The repair handles recursive nested dictionary updates and the supplied tests pass.
+      - id: constraints_and_test_integrity
+        weight: 0.25
+        instruction: The test file remains unchanged and the implementation follows the task's stated constraints.
+      - id: progress_note
+        weight: 0.15
+        instruction: out/progress.md concisely records the failure, root cause, and fix.
+  019-incident-runbook-synthesis:
+    criteria:
+      - id: incident_report
+        weight: 0.50
+        instruction: Assess factual root-cause analysis, evidence, timeline, recommendations, approval boundaries, and stakeholder messages. Accept equivalent wording when facts and required fields are correct.
+      - id: rollback_plan
+        weight: 0.20
+        instruction: Assess safe, actionable rollback or degradation steps, approval sequencing, verification metrics, triggers, and stop conditions. Accept equivalent wording unless the task requires an exact phrase.
+      - id: evidence_matrix
+        weight: 0.20
+        instruction: Assess claim-to-source traceability and coverage of the required evidence sources.
+      - id: status_update
+        weight: 0.10
+        instruction: Assess a clear non-technical update covering impact, status, next steps, and update timing.
+  025-meeting-action-tracker:
+    criteria:
+      - id: action_table
+        weight: 0.60
+        instruction: Assess complete, correctly merged open actions, owners, deadlines, statuses, IDs, sources, and recency/dependency rules. Accept equivalent task wording while preserving required IDs, names, dates, and state.
+      - id: owner_followups
+        weight: 0.20
+        instruction: Assess clear owner-grouped follow-ups with correct deadlines and dependency blockers.
+      - id: merge_rationale
+        weight: 0.20
+        instruction: Assess traceable explanations of carry-forward, update, reassignment, cancellation, completion, and dependency decisions.
+  050-multitable-join-analysis:
+    criteria:
+      - id: customer_metrics
+        weight: 0.50
+        instruction: Assess customer-level revenue calculations, aliases, duplicate/cancelled/orphan handling, currency conversion, segment thresholds, required columns, and sorting. Equivalent numeric representations count only when the task permits them.
+      - id: region_summary
+        weight: 0.15
+        instruction: Assess valid region-level counts and gross/net totals against the supplied input facts and reference facts.
+      - id: reconciliation_audit
+        weight: 0.20
+        instruction: Assess correct anomaly and chargeback classifications and complete sorted audit IDs.
+      - id: reconciliation_notes
+        weight: 0.10
+        instruction: Assess clear explanation of revenue basis, anomalies, and canonical customer merges.
+      - id: input_preserved
+        weight: 0.05
+        instruction: Confirm supplied input files remain unchanged.

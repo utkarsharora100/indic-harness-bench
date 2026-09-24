@@ -1,0 +1,36 @@
+version: outcome-rubric-pilot-v14-v7
+score_levels:
+  0: absent_or_contradicted
+  1: attempted_with_major_errors
+  2: useful_partial_work
+  3: substantially_correct_minor_omissions
+  4: fully_satisfies_requirement
+evidence_schema_version: 5
+tasks:
+  001-file:
+    criteria:
+      - {id: correct_line_count, weight: 0.80, instruction: "Compare submitted out/linecount.txt with the expected count computed from the pinned input; answer key is not a submission."}
+      - {id: input_preserved, weight: 0.20, instruction: "Confirm submitted input is byte-identical to the pinned fixture."}
+  016-code-repair-pytest:
+    criteria:
+      - {id: working_repair, weight: 0.60, instruction: "Assess the submitted recursive nested-dictionary update code and independent pytest results; expected constraints are not a reference patch."}
+      - {id: constraints_and_test_integrity, weight: 0.25, instruction: "Assess submitted code constraints and test integrity using pinned test bytes."}
+      - {id: progress_note, weight: 0.15, instruction: "Assess submitted out/progress.md for failure, root cause, and fix."}
+  019-incident-runbook-synthesis:
+    criteria:
+      - {id: incident_report, weight: 0.50, instruction: "Compare the submitted report with reference facts for root cause, timeline, evidence, recommendations, approvals, and communications; accept equivalent wording."}
+      - {id: rollback_plan, weight: 0.20, instruction: "Assess submitted rollback plan for safe steps, approvals, triggers, metrics, and stop conditions."}
+      - {id: evidence_matrix, weight: 0.20, instruction: "Assess submitted evidence matrix for claim-to-source traceability."}
+      - {id: status_update, weight: 0.10, instruction: "Assess submitted status update for impact, status, next steps, and timing."}
+  025-meeting-action-tracker:
+    criteria:
+      - {id: action_table, weight: 0.60, instruction: "Compare submitted action rows with expected actions, preserving required IDs, owners, dates, and states; accept equivalent wording."}
+      - {id: owner_followups, weight: 0.20, instruction: "Compare submitted follow-ups with expected owners and dependencies."}
+      - {id: merge_rationale, weight: 0.20, instruction: "Assess submitted rationale for carry-forward, updates, reassignment, cancellation, completion, and dependencies."}
+  050-multitable-join-analysis:
+    criteria:
+      - {id: customer_metrics, weight: 0.50, instruction: "Compare submitted customer metrics CSV with expected headers and rows, calculations, aliases, anomalies, conversion, and sorting."}
+      - {id: region_summary, weight: 0.15, instruction: "Compare submitted region JSON with expected counts and gross/net totals."}
+      - {id: reconciliation_audit, weight: 0.20, instruction: "Compare submitted audit JSON with expected anomaly and chargeback IDs."}
+      - {id: reconciliation_notes, weight: 0.10, instruction: "Assess submitted notes for revenue basis, anomalies, and canonical merges."}
+      - {id: input_preserved, weight: 0.05, instruction: "Confirm supplied input CSV files match the pinned fixtures byte-for-byte."}

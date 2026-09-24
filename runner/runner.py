@@ -64,6 +64,21 @@ def workspace_sha256(workspace: Path) -> str:
     return digest.hexdigest()
 
 
+def _first_proxy_prompt_tokens(events: list[dict[str, Any]]) -> int | None:
+    """Extract the first request's prompt usage without summing later turns."""
+    for event in events:
+        if event.get("event_type") != "proxy_response":
+            continue
+        data = event.get("data")
+        usage = data.get("usage") if isinstance(data, dict) else None
+        if not isinstance(usage, dict):
+            continue
+        value = usage.get("prompt_tokens", usage.get("input_tokens"))
+        if isinstance(value, int) and value >= 0:
+            return value
+    return None
+
+
 def stable_cell_id(
     experiment_id: str,
     dataset_revision: str,
@@ -636,6 +651,15 @@ class ExperimentRunner:
                     response.metadata["proxy_calls"] = (
                         proxy._cell_calls if proxy is not None else (sidecar_snapshot or {}).get("calls", 0)
                     )
+                    if (
+                        sidecar_snapshot is not None
+                        and response.metadata.get("initial_prompt_tokens") is None
+                    ):
+                        initial_prompt_tokens = _first_proxy_prompt_tokens(
+                            sidecar_snapshot.get("events", [])
+                        )
+                        if initial_prompt_tokens is not None:
+                            response.metadata["initial_prompt_tokens"] = initial_prompt_tokens
                 if cell.agent != "react":
                     response.metadata["tool_calls"] = int(response.metadata.get("native_tool_calls", 0) or 0)
                     response.metadata["failed_tool_calls"] = int(
@@ -812,7 +836,7 @@ class ExperimentRunner:
         data = json.loads(json.dumps(self.config.data, ensure_ascii=False))
         if isinstance(data.get("inference"), dict):
             data["inference"].pop("api_key", None)
-        if self.config.experiment.get("version") == "corrected-v13":
+        if self.config.is_corrected_phase1:
             paths = {
                 "dataset": self.config.experiment["dataset_manifest"],
                 "translations": self.config.experiment["translations_manifest"],
@@ -839,7 +863,7 @@ class ExperimentRunner:
         return data
 
     def assert_experiment_identity(self) -> None:
-        """Reject scoring or resuming under changed v13 runtime provenance."""
+        """Reject scoring or resuming under changed corrected-study provenance."""
         row = self.store.connection.execute(
             "SELECT config_json, manifest_json FROM experiment WHERE experiment_id = ?",
             (self.config.experiment_id,),

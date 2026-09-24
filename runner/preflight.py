@@ -34,10 +34,10 @@ def check_docker_image(config: ExperimentConfig) -> dict[str, Any]:
     try:
         client.ping()
         image = client.images.get(config.sandbox["image"])
-        if config.experiment.get("version") == "corrected-v13":
+        if config.is_corrected_phase1:
             expected = str(((_runtime_manifest(config).get("images") or {}).get("benchmark") or {}).get("image_id", ""))
             if not expected or str(image.attrs.get("Id", "")) != expected:
-                raise PreflightError("Benchmark image differs from the frozen v13 runtime manifest")
+                raise PreflightError("Benchmark image differs from the frozen runtime manifest")
         digest = None
         repo_digests = getattr(image, "attrs", {}).get("RepoDigests", [])
         if repo_digests:
@@ -168,7 +168,7 @@ def check_proxy_image(config: ExperimentConfig) -> dict[str, Any]:
 
 def check_shared_task_tools(config: ExperimentConfig, agents: dict[str, Any]) -> dict[str, Any]:
     """Require equivalent executable task resources in all three harness images."""
-    if config.experiment.get("version") != "corrected-v13":
+    if not config.is_corrected_phase1:
         return {"checked": False}
     import docker
 
@@ -274,15 +274,59 @@ if ids != [os.environ['PHASE1_PROXY_MODEL']]:
 result = call('/chat/completions', {
     'model': os.environ['PHASE1_PROXY_MODEL'],
     'messages': [{'role': 'user', 'content': 'Use the add tool to add 2 and 3.'}],
-    'tools': [{'type': 'function', 'function': {'name': 'add', 'description': 'Add two integers.', 'parameters': {'type': 'object', 'properties': {'a': {'type': 'integer'}, 'b': {'type': 'integer'}}, 'required': ['a', 'b'], 'additionalProperties': False}}}],
+    'tools': [{
+        'type': 'function', 'function': {
+            'name': 'add', 'description': 'Add two integers.',
+            'parameters': {
+                'type': 'object',
+                'properties': {'a': {'type': 'integer'}, 'b': {'type': 'integer'}},
+                'required': ['a', 'b'], 'additionalProperties': False,
+            },
+        },
+    }],
     'tool_choice': 'auto', 'temperature': 0, 'top_p': 1, 'max_tokens': __MAX_TOKENS__, 'stream': False,
 })
 calls = ((result.get('choices') or [{}])[0].get('message') or {}).get('tool_calls')
 if not calls or calls[0].get('function', {}).get('name') != 'add':
     raise RuntimeError('tool-call-mismatch')
+stream_request = urllib.request.Request(
+    base + '/chat/completions',
+    data=json.dumps({
+        'model': os.environ['PHASE1_PROXY_MODEL'],
+        'messages': [{'role': 'user', 'content': 'Reply with one short word.'}],
+        'temperature': 0, 'top_p': 1, 'max_tokens': __MAX_TOKENS__,
+        'stream': True, 'stream_options': {'include_usage': True},
+    }).encode(),
+    headers=headers, method='POST',
+)
+with urllib.request.urlopen(stream_request, timeout=30) as response:
+    stream_body = response.read().decode('utf-8', errors='replace')
+stream_usage = None
+stream_chunks = 0
+for line in stream_body.splitlines():
+    if not line.startswith('data:'):
+        continue
+    item = line[5:].strip()
+    if not item or item == '[DONE]':
+        continue
+    try:
+        chunk = json.loads(item)
+    except json.JSONDecodeError:
+        continue
+    stream_chunks += 1
+    if isinstance(chunk, dict) and isinstance(chunk.get('usage'), dict):
+        stream_usage = chunk['usage']
+if (
+    stream_chunks < 1
+    or not isinstance(stream_usage, dict)
+    or not stream_usage.get('total_tokens')
+):
+    raise RuntimeError('stream-usage-missing')
 print('proxy-ok')
 """
-        probe_script = probe_script.replace("__MAX_TOKENS__", str(int(config.generation.get("max_tokens", 2048))))
+        probe_script = probe_script.replace(
+            "__MAX_TOKENS__", str(int(config.generation.get("max_tokens", 2048)))
+        )
         probe = client.containers.run(
             config.sandbox["image"],
             command=["python", "-c", probe_script],
@@ -309,11 +353,16 @@ print('proxy-ok')
                 f"The internal model-proxy tool-call probe failed (exit={status_code}, {diagnostic or 'no-safe-diagnostic'})"
             )
         snapshot = sidecar.seal()
-        if int(snapshot.get("calls", 0)) != 1:
-            raise PreflightError("The internal model proxy did not record the probe call")
+        usage = snapshot.get("usage") or {}
+        if int(snapshot.get("calls", 0)) != 2:
+            raise PreflightError("The internal model proxy did not record both probe calls")
+        if not all(isinstance(usage.get(key), int) and usage[key] > 0
+                   for key in ("input_tokens", "output_tokens", "total_tokens")):
+            raise PreflightError("The internal model proxy did not capture streamed token usage")
         if endpoint.resolved_model in json.dumps(snapshot, ensure_ascii=False):
             raise PreflightError("The private served model identifier appeared in sidecar trace data")
-        return {"enabled": True, "tool_call_verified": True, "calls": 1}
+        return {"enabled": True, "tool_call_verified": True, "stream_usage_verified": True,
+                "calls": 2, "usage_present": True}
     except (docker.errors.DockerException, OSError, TimeoutError) as exc:
         raise PreflightError("The internal model-proxy sidecar preflight failed") from exc
     finally:
@@ -421,7 +470,7 @@ def full_preflight(
 
 def check_pilot_fixture_parity(config: ExperimentConfig, tasks: list[Any]) -> dict[str, Any]:
     """Recreate post-hook workspaces in all conditions before any cell exists."""
-    if config.experiment.get("version") != "corrected-v13":
+    if not config.is_corrected_phase1:
         return {"checked": False}
     from runner.runner import workspace_sha256
 
@@ -463,18 +512,18 @@ def check_pilot_fixture_parity(config: ExperimentConfig, tasks: list[Any]) -> di
 
 
 def check_calibration(config: ExperimentConfig) -> dict[str, Any]:
-    """A v13 pilot cannot run with an untested or changed generation cap."""
-    if config.experiment.get("version") != "corrected-v13":
+    """A corrected Phase I experiment needs a calibrated generation cap."""
+    if not config.is_corrected_phase1:
         return {"checked": False}
     from scripts.calibrate_pilot_budget import PROBES
 
     path = config.root / config.inference.get("calibration_manifest", "")
     if not path.is_file():
-        raise PreflightError("The v13 synthetic generation-budget calibration is missing")
+        raise PreflightError("The synthetic generation-budget calibration is missing")
     try:
         record = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise PreflightError("The v13 calibration manifest is invalid") from exc
+        raise PreflightError("The calibration manifest is invalid") from exc
     if record.get("experiment_id") != config.experiment_id:
         raise PreflightError("Calibration belongs to another experiment")
     selected = record.get("selected_max_tokens")
