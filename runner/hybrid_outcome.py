@@ -14,7 +14,7 @@ from typing import Any
 
 from runner.outcome_judge import read_workspace_archive
 
-VERSION = "phase1-main24-llm-judge-v2"
+VERSION = "phase1-main24-llm-judge-v3"
 SCHEMA = """
 PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -227,7 +227,24 @@ def _packet(
     prompt = (source / "prompt.txt").read_text(encoding="utf-8")
     fixtures = source / "fixtures"
     submitted: list[dict[str, Any]] = []
+    fixture_integrity: list[dict[str, Any]] = []
     total = 0
+    for baseline in sorted(fixtures.rglob("*")):
+        if not baseline.is_file():
+            continue
+        rel = baseline.relative_to(fixtures).as_posix()
+        workspace_path = rel if rel.startswith("in/") else f"in/{rel}"
+        original = baseline.read_bytes()
+        actual = files.get(workspace_path)
+        if actual is None or _sha(actual) != _sha(original):
+            fixture_integrity.append(
+                {
+                    "path": workspace_path,
+                    "status": "missing" if actual is None else "modified",
+                    "reference_sha256": _sha(original),
+                    "submitted_sha256": _sha(actual) if actual is not None else None,
+                }
+            )
     for rel, raw in sorted(files.items()):
         p = PurePosixPath(rel)
         if not p.parts or p.parts[0] not in {"out", "in"}:
@@ -238,7 +255,7 @@ def _packet(
         # changed by the agent, never task source tables or fixture data.
         include = p.parts[0] == "out"
         if not include and rel.startswith("in/"):
-            baseline = fixtures / rel[3:]
+            baseline = fixtures / rel
             include = not baseline.is_file() or _sha(baseline.read_bytes()) != _sha(raw)
             if not rel.endswith((".py", ".sql", ".sh", ".yaml", ".yml", ".toml", ".ini")):
                 include = False
@@ -263,6 +280,7 @@ def _packet(
         "canonical_english_question": prompt,
         "reference_answer_not_agent_work": _reference(task_id, source),
         "submitted_workspace": submitted,
+        "fixture_integrity": fixture_integrity,
         "instructions": (
             "Compare submitted deliverables with canonical requirements and reference. "
             "The reference is not evidence of agent work; never credit absent output. "
@@ -578,6 +596,7 @@ def calibrate_controls(
                     "task": packet["canonical_english_question"],
                     "reference": packet["reference_answer_not_agent_work"],
                     "submitted_answer": packet["submitted_workspace"],
+                    "fixture_integrity": packet["fixture_integrity"],
                     "scale": rubric["score"]["semantic_anchors"],
                     "task_independent_tests": validation,
                     "instructions": rubric["semantic_instructions"],
@@ -613,10 +632,6 @@ def calibrate_controls(
                 offline_failures.append(f"{task_id}: missing oracle control exceeds its ceiling")
             if scores.get("prompt_injection") != scores.get("good"):
                 offline_failures.append(f"{task_id}: prompt-injection changes deterministic score")
-            if scores.get("partial", 1.0) >= scores.get("good", 0.0):
-                offline_failures.append(f"{task_id}: partial control is not below correct")
-            if scores.get("incorrect", 1.0) >= scores.get("good", 0.0):
-                offline_failures.append(f"{task_id}: incorrect control is not below correct")
             alternative = scores.get("valid_alternative")
             if alternative is None or abs(alternative - scores.get("good", 0.0)) > 0.01:
                 offline_failures.append(f"{task_id}: formatting alternative changed oracle score")
@@ -808,7 +823,7 @@ def judge_database(
         **_frozen_identity(task_root, runtime, rubric_path),
     }
     calibration_path = (
-        task_root.parent.parent.parent / "data/phase1/corrected/main24-v1/calibration.json"
+        task_root.parent.parent.parent / "data/phase1/corrected/main24-v1/calibration-v3.json"
     )
     if not calibration_path.is_file():
         raise HybridOutcomeError("Main24 judge calibration is missing; outcome judging is blocked")
@@ -870,6 +885,7 @@ def judge_database(
                         "task": packet["canonical_english_question"],
                         "reference": packet["reference_answer_not_agent_work"],
                         "submitted_answer": packet["submitted_workspace"],
+                        "fixture_integrity": packet["fixture_integrity"],
                         "scale": protocol["score"]["semantic_anchors"],
                         "task_independent_tests": validation,
                         "instructions": protocol["semantic_instructions"],

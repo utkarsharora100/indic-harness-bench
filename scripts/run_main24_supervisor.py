@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MAIN_CONFIG = "configs/phase1.corrected.main24-v1.yaml"
 SMOKE_CONFIG = "configs/phase1.corrected.smoke050-v1.yaml"
 PILOT_DB = ROOT / "data/phase1/corrected/pilot-v14/runs.sqlite"
-PILOT_REJUDGMENT = ROOT / "data/phase1/corrected/pilot-v14/rejudgments/outcome-main24-v1"
+PILOT_REJUDGMENT = ROOT / "data/phase1/corrected/pilot-v14/rejudgments/outcome-main24-v3"
 RUN_DIR = ROOT / "data/phase1/corrected/main24-v1"
 LOG_PATH = RUN_DIR / "supervisor.log"
 STATUS_PATH = RUN_DIR / "status.json"
@@ -242,7 +242,7 @@ class Supervisor:
             "--database",
             "data/phase1/corrected/pilot-v14/runs.sqlite",
             "--output",
-            "data/phase1/corrected/pilot-v14/rejudgments/outcome-main24-v1/judgments.sqlite",
+            "data/phase1/corrected/pilot-v14/rejudgments/outcome-main24-v3/judgments.sqlite",
             "--expected-cells",
             "44",
             "--experiment-id",
@@ -269,20 +269,20 @@ class Supervisor:
             "--database",
             "data/phase1/corrected/smoke050-v1/runs.sqlite",
             "--output",
-            "data/phase1/corrected/smoke050-v1/outcomes.sqlite",
+            "data/phase1/corrected/smoke050-v1/outcomes-v3.sqlite",
             "--expected-cells",
             "9",
             "--experiment-id",
             smoke_id,
         )
-        self._check_outcomes(ROOT / "data/phase1/corrected/smoke050-v1/outcomes.sqlite", 9)
+        self._check_outcomes(ROOT / "data/phase1/corrected/smoke050-v1/outcomes-v3.sqlite", 9)
         self.stage(
             "task_050_process_security_judging",
             "judge",
             "--config",
             SMOKE_CONFIG,
             "--outcome-database",
-            "data/phase1/corrected/smoke050-v1/outcomes.sqlite",
+            "data/phase1/corrected/smoke050-v1/outcomes-v3.sqlite",
         )
         self._check_process_judgments(smoke_db, smoke_id, 9)
 
@@ -296,14 +296,14 @@ class Supervisor:
             "--config",
             MAIN_CONFIG,
         )
-        self._check_outcomes(ROOT / "data/phase1/corrected/main24-v1/outcomes.sqlite", 216)
+        self._check_outcomes(ROOT / "data/phase1/corrected/main24-v1/outcomes-v3.sqlite", 216)
         self.stage(
             "main_216_process_security_judging",
             "judge",
             "--config",
             MAIN_CONFIG,
             "--outcome-database",
-            "data/phase1/corrected/main24-v1/outcomes.sqlite",
+            "data/phase1/corrected/main24-v1/outcomes-v3.sqlite",
         )
         self._check_process_judgments(main_db, main_id, 216)
         self._verify_pilot_baselines()

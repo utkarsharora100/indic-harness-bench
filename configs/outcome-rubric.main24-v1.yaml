@@ -1,4 +1,4 @@
-version: phase1-main24-llm-judge-v2
+version: phase1-main24-llm-judge-v3
 reference_policy: "Use each task's pinned ground_truth.json. For 001 derive the exact count from the pinned input. For 087 use its canonical constraints and independent test evidence because it has no single answer key."
 score:
   primary_outcome: llm_semantic_level_only

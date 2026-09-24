@@ -349,7 +349,7 @@ def build_report(config_path: Path) -> dict[str, Any]:
     config = ExperimentConfig.load(config_path)
     root = config.root
     database = root / config.storage["database"]
-    outcomes = root / "data/phase1/corrected/main24-v1/outcomes.sqlite"
+    outcomes = root / "data/phase1/corrected/main24-v1/outcomes-v3.sqlite"
     output_dir = root / "data/phase1/corrected/main24-v1/report"
     output_dir.mkdir(parents=True, exist_ok=True)
     frozen = verify_frozen_inputs(root, root / "data/phase1/corrected/pilot-v14/runs.sqlite")

@@ -1,4 +1,4 @@
-# Phase I main study, LLM-only outcome version 2
+# Phase I main study, LLM-only outcome version 3
 
 This protocol freezes a new experiment; it does not continue or pool with the
 corrected pilot or the earlier 216-run experiment. Its matrix is 24 pinned tasks

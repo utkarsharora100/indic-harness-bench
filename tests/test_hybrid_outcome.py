@@ -33,11 +33,20 @@ def test_packet_separates_reference_from_actual_submission(tmp_path: Path) -> No
     source.mkdir()
     (source / "prompt.txt").write_text("Write a report.", encoding="utf-8")
     (source / "ground_truth.json").write_text('{"answer":"gold"}', encoding="utf-8")
-    (source / "fixtures").mkdir()
-    packet = _packet("004-meeting-summary", source, {"out/summary.md": b"submitted"}, None)
+    fixture = source / "fixtures" / "in" / "input.txt"
+    fixture.parent.mkdir(parents=True)
+    fixture.write_bytes(b"reference input")
+    packet = _packet(
+        "004-meeting-summary",
+        source,
+        {"out/summary.md": b"submitted", "in/input.txt": b"mutated input"},
+        None,
+    )
     assert packet["reference_answer_not_agent_work"]["facts"] == {"answer": "gold"}
     assert packet["submitted_workspace"][0]["content"] == "submitted"
     assert "gold" not in packet["submitted_workspace"][0]["content"]
+    assert packet["fixture_integrity"][0]["path"] == "in/input.txt"
+    assert packet["fixture_integrity"][0]["status"] == "modified"
 
 
 def test_missing_submitted_deliverable_is_not_inferred_from_reference(tmp_path: Path) -> None:
