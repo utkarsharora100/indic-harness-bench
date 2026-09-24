@@ -446,7 +446,17 @@ def full_preflight(
         "repetitions": int(config.experiment.get("repetitions", 0)),
     }
     matrix["cells"] = matrix["tasks"] * matrix["languages"] * matrix["agents"] * matrix["repetitions"]
-    if matrix["cells"] not in {45, 648}:
+    allowed_matrices = {
+        (1, 3, 3, 1): 9,        # isolated task-050 smoke
+        (5, 3, 3, 1): 45,       # corrective pilot
+        (24, 3, 3, 1): 216,     # one attempt per main-study condition
+        (24, 3, 3, 3): 648,     # originally proposed repeated main study
+    }
+    dimensions = (
+        matrix["tasks"], matrix["languages"], matrix["agents"], matrix["repetitions"]
+    )
+    expected_cells = allowed_matrices.get(dimensions)
+    if expected_cells is None or matrix["cells"] != expected_cells:
         raise PreflightError(f"Unexpected corrective Phase I matrix size: {matrix['cells']}")
     result = {"experiment_id": config.experiment_id, "matrix": matrix}
     selection_path = config.root / config.experiment.get("dataset_manifest", "benchmark/task_selection.yaml")
@@ -524,7 +534,10 @@ def check_calibration(config: ExperimentConfig) -> dict[str, Any]:
         record = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise PreflightError("The calibration manifest is invalid") from exc
-    if record.get("experiment_id") != config.experiment_id:
+    calibration_identity = str(
+        config.inference.get("calibration_source_experiment", config.experiment_id)
+    )
+    if record.get("experiment_id") != calibration_identity:
         raise PreflightError("Calibration belongs to another experiment")
     selected = record.get("selected_max_tokens")
     if selected not in (4096, 8192) or selected != config.generation.get("max_tokens"):

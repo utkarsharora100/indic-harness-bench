@@ -24,6 +24,7 @@ data/phase1/
 /output/pdf/indic_harness_phase1_llm_judged_regrade_v6.pdf
 /output/pdf/indic_harness_phase1_llm_judged_regrade_v7.pdf
 /output/pdf/indic_harness_phase1_llm_judged_regrade_v8.pdf
+/output/pdf/indic_harness_phase1_main24_v1.pdf
 benchmark/translations/phase1.partial.yaml
 
 tmp/

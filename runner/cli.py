@@ -18,6 +18,10 @@ from benchmark.loader import discover_tasks, select_tasks
 from runner.config import ExperimentConfig
 from runner.inference import ensure_model_manifest, load_env_file
 from runner.judge import judge_database
+from runner.hybrid_outcome import (
+    calibrate_controls as calibrate_hybrid_outcomes,
+    judge_database as judge_hybrid_outcomes,
+)
 from runner.outcome_calibration import build_calibration_cases
 from runner.outcome_calibration_finalize import finalize_calibration_store
 from runner.outcome_judge import sha256_text
@@ -57,7 +61,11 @@ def _safe_command_error(label: str, exc: Exception, model_config: dict | None = 
             )
             if isinstance(value, str) and value
         )
-    message = redact_text(str(exc), secrets) if model_config is not None else "details withheld until credentials are loaded"
+    message = (
+        redact_text(str(exc), secrets)
+        if model_config is not None
+        else "details withheld until credentials are loaded"
+    )
     console.print(f"{label} failed: {type(exc).__name__}: {message}")
 
 
@@ -99,6 +107,38 @@ def list_tasks(tasks_dir: Path = typer.Option(Path("benchmark/tasks"), exists=Tr
     console.print(table)
 
 
+@app.command("preflight-study")
+def preflight_study(
+    config: Path = typer.Option(Path("configs/phase1.corrected.main24-v1.yaml"), exists=True),
+) -> None:
+    """Run every frozen source, Docker, model, proxy and fixture gate without creating cells."""
+    experiment = ExperimentConfig.load(config)
+    try:
+        agents, models, _ = load_runtime(experiment)
+        tasks = select_tasks(experiment.task_root, experiment.configured_task_ids)
+        result = full_preflight(experiment, tasks, agents, models)
+    except PreflightError as exc:
+        console.print(f"Study preflight failed: {exc}")
+        raise typer.Exit(code=2) from exc
+    except Exception as exc:
+        console.print(
+            f"Study preflight failed: {type(exc).__name__}; private inference details withheld."
+        )
+        raise typer.Exit(code=2) from None
+    console.print(
+        {
+            "experiment_id": result["experiment_id"],
+            "matrix": result["matrix"],
+            "prepared_tasks": result["prepared_tasks"],
+            "language_variants": result["language_variants"],
+            "fresh_fixture_tasks": result["fresh_fixtures"].get("tasks"),
+            "model_tool_call_verified": result["runtime"]["university_gpu"]["tool_call_verified"],
+            "proxy_stream_usage_verified": result["proxy_sidecar"].get("stream_usage_verified"),
+            "native_runtimes": sorted(result["native"]),
+        }
+    )
+
+
 @app.command("run")
 def run(
     config: Path = typer.Option(Path("configs/phase1.research.yaml"), exists=True),
@@ -106,7 +146,13 @@ def run(
     max_cells: int | None = typer.Option(None, min=1),
 ) -> None:
     experiment_config = ExperimentConfig.load(config)
-    agents, models, _ = load_runtime(experiment_config)
+    try:
+        agents, models, _ = load_runtime(experiment_config)
+    except Exception as exc:
+        console.print(
+            f"Private inference preflight failed: {type(exc).__name__}; details withheld."
+        )
+        raise typer.Exit(code=2) from None
     task_ids = experiment_config.configured_task_ids
     task_defs = select_tasks(experiment_config.task_root, task_ids)
     try:
@@ -125,7 +171,9 @@ def run(
         summary = runner.completion_summary(task_defs)
     finally:
         runner.close()
-    successful = sum(1 for result in results if result["status"] == "completed" and result["success"])
+    successful = sum(
+        1 for result in results if result["status"] == "completed" and result["success"]
+    )
     completed = sum(1 for result in results if result["status"] == "completed")
     console.print(
         f"Matrix {matrix['cells']} cells; processed {len(results)}; "
@@ -136,6 +184,84 @@ def run(
         summary["gradable"] != summary["expected"] or summary["infrastructure_error"]
     ):
         raise typer.Exit(code=2)
+
+
+@app.command("judge-main24-outcomes")
+def judge_main24_outcomes(
+    config: Path = typer.Option(Path("configs/phase1.corrected.main24-v1.yaml"), exists=True),
+    database: Path = typer.Option(Path("data/phase1/corrected/main24-v1/runs.sqlite"), exists=True),
+    output: Path = typer.Option(Path("data/phase1/corrected/main24-v1/outcomes.sqlite")),
+    expected_cells: int = typer.Option(216, min=1),
+    experiment_id: str | None = typer.Option(None, "--experiment-id"),
+) -> None:
+    """Resume the frozen LLM-only outcome judge without opening the run DB read-write."""
+    runtime = None
+    try:
+        experiment = ExperimentConfig.load(config)
+        runtime = OutcomeJudgeRuntime(experiment.root, experiment.inference)
+        with runtime:
+            result = judge_hybrid_outcomes(
+                database=experiment.root / database,
+                output=experiment.root / output,
+                experiment_id=experiment_id or experiment.experiment_id,
+                task_root=experiment.task_root,
+                workspace_image=str(experiment.sandbox["image"]),
+                runtime=runtime,
+                expected_cells=expected_cells,
+                seed=int(experiment.experiment.get("seed", 1701)),
+            )
+        console.print(result)
+        if result.get("completed") != expected_cells or result.get("errors"):
+            raise typer.Exit(code=2)
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        message = (
+            redact_text(str(exc), runtime.secrets)
+            if runtime and runtime.secrets
+            else "Details withheld until private inference settings are loaded."
+        )
+        console.print(f"Hybrid outcome judging failed: {type(exc).__name__}: {message}")
+        raise typer.Exit(code=2) from None
+
+
+@app.command("calibrate-main24-outcomes")
+def calibrate_main24_outcomes(
+    config: Path = typer.Option(Path("configs/phase1.corrected.main24-v1.yaml"), exists=True),
+    output: Path = typer.Option(Path("data/phase1/corrected/main24-v1/calibration.sqlite")),
+) -> None:
+    """Run the frozen reference-guided outcome controls and save their status."""
+    runtime = None
+    try:
+        experiment = ExperimentConfig.load(config)
+        runtime = OutcomeJudgeRuntime(experiment.root, experiment.inference)
+        with runtime:
+            result = calibrate_hybrid_outcomes(
+                task_root=experiment.task_root,
+                workspace_image=str(experiment.sandbox["image"]),
+                runtime=runtime,
+                output=experiment.root / output,
+                seed=int(experiment.experiment.get("seed", 1701)),
+            )
+        console.print(
+            {
+                "status": result["status"],
+                "controls": result["control_count"],
+                "failed_checks": [item for item in result["checks"] if not item["passed"]],
+            }
+        )
+        if result["status"] != "passed":
+            raise typer.Exit(code=2)
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        message = (
+            redact_text(str(exc), runtime.secrets)
+            if runtime and runtime.secrets
+            else "Details withheld until private inference settings are loaded."
+        )
+        console.print(f"Hybrid outcome calibration failed: {type(exc).__name__}: {message}")
+        raise typer.Exit(code=2) from None
 
 
 @app.command("report")
@@ -160,8 +286,12 @@ def corrected_report(
     if experiment_config.is_corrected_phase1:
         tasks = select_tasks(experiment_config.task_root, experiment_config.configured_task_ids)
         pristine = check_pilot_fixture_parity(experiment_config, tasks)["pristine_oracle_scores"]
-    result = build_corrected_report(db, output, experiment_id or experiment_config.experiment_id,
-                                    pristine_oracle_scores=pristine)
+    result = build_corrected_report(
+        db,
+        output,
+        experiment_id or experiment_config.experiment_id,
+        pristine_oracle_scores=pristine,
+    )
     console.print(
         f"Wrote {output}; {result['cells']['completed_rows']} completed cells, "
         f"{result['cells']['oracle_gradable']} oracle-gradable."
@@ -172,8 +302,15 @@ def corrected_report(
 def judge(
     config: Path = typer.Option(Path("configs/phase1.corrected.research.yaml"), exists=True),
     database: Path | None = typer.Option(None),
+    outcome_database: Path | None = typer.Option(
+        None, help="Optional LLM outcome store for the diagnostic aggregate."
+    ),
     experiment_id: str | None = typer.Option(None),
-    rerun: bool = typer.Option(False, "--rerun", help="Recompute all process judgments under the current frozen normalizer."),
+    rerun: bool = typer.Option(
+        False,
+        "--rerun",
+        help="Recompute all process judgments under the current frozen normalizer.",
+    ),
 ) -> None:
     """Run the frozen paper-style process rubric after agent execution."""
     experiment_config = ExperimentConfig.load(config)
@@ -190,6 +327,9 @@ def judge(
             max_tokens=int(experiment_config.generation.get("max_tokens", 2048)),
             proxy=runner.proxies.get(model_name),
             rerun=rerun,
+            outcome_database=(experiment_config.root / outcome_database)
+            if outcome_database
+            else None,
         )
     finally:
         runner.close()
@@ -199,7 +339,9 @@ def judge(
 @app.command("judge-outcomes")
 def judge_outcomes(
     config: Path = typer.Option(Path("configs/phase1.corrected.pilot-v14.yaml"), exists=True),
-    source_database: Path = typer.Option(Path("data/phase1/corrected/pilot-v14/runs.sqlite"), exists=True),
+    source_database: Path = typer.Option(
+        Path("data/phase1/corrected/pilot-v14/runs.sqlite"), exists=True
+    ),
     rubric: Path = typer.Option(OUTCOME_RUBRIC, exists=True),
     calibration: Path = typer.Option(OUTCOME_DIR / "calibration.json", exists=True),
     store: Path = typer.Option(OUTCOME_DIR / "judgments.sqlite"),
@@ -232,7 +374,11 @@ def judge_outcomes(
                 max_cells=max_cells,
             )
     except Exception as exc:
-        message = redact_text(str(exc), runtime.secrets) if runtime and runtime.secrets else "Details withheld until the private inference settings are loaded."
+        message = (
+            redact_text(str(exc), runtime.secrets)
+            if runtime and runtime.secrets
+            else "Details withheld until the private inference settings are loaded."
+        )
         console.print(f"Outcome judging failed: {type(exc).__name__}: {message}")
         raise typer.Exit(code=2) from None
     console.print(result)
@@ -244,7 +390,9 @@ def calibrate_outcomes(
     rubric: Path = typer.Option(OUTCOME_RUBRIC, exists=True),
     store: Path = typer.Option(OUTCOME_DIR / "calibration.sqlite"),
     output: Path = typer.Option(OUTCOME_DIR / "calibration.json"),
-    source_database: Path = typer.Option(Path("data/phase1/corrected/pilot-v14/runs.sqlite"), exists=True),
+    source_database: Path = typer.Option(
+        Path("data/phase1/corrected/pilot-v14/runs.sqlite"), exists=True
+    ),
     experiment_id: str = typer.Option("phase1_corrected_pilot_v14"),
     seed: int = typer.Option(1701),
 ) -> None:
@@ -270,10 +418,20 @@ def calibrate_outcomes(
                 seed=seed,
             )
     except Exception as exc:
-        message = redact_text(str(exc), runtime.secrets) if runtime and runtime.secrets else "Details withheld until the private inference settings are loaded."
+        message = (
+            redact_text(str(exc), runtime.secrets)
+            if runtime and runtime.secrets
+            else "Details withheld until the private inference settings are loaded."
+        )
         console.print(f"Outcome calibration failed: {type(exc).__name__}: {message}")
         raise typer.Exit(code=2) from None
-    console.print({"status": report["status"], "control_count": report["control_count"], "checks": report["checks"]})
+    console.print(
+        {
+            "status": report["status"],
+            "control_count": report["control_count"],
+            "checks": report["checks"],
+        }
+    )
 
 
 @app.command("finalize-outcome-calibration")
@@ -333,7 +491,9 @@ def finalize_outcome_calibration(
 @app.command("outcome-preflight")
 def outcome_preflight(
     config: Path = typer.Option(Path("configs/phase1.corrected.pilot-v14.yaml"), exists=True),
-    source_database: Path = typer.Option(Path("data/phase1/corrected/pilot-v14/runs.sqlite"), exists=True),
+    source_database: Path = typer.Option(
+        Path("data/phase1/corrected/pilot-v14/runs.sqlite"), exists=True
+    ),
     experiment_id: str = typer.Option("phase1_corrected_pilot_v14"),
 ) -> None:
     """Validate frozen sources, every saved archive/trace, Docker tests, and deterministic controls."""
@@ -352,7 +512,9 @@ def outcome_preflight(
         cases = build_calibration_cases(experiment_config.task_root)
         oracle_scores = {
             case["case_id"]: _grade_control_oracle(
-                case["task_id"], case["files"], experiment_config.task_root,
+                case["task_id"],
+                case["files"],
+                experiment_config.task_root,
                 str(experiment_config.sandbox["image"]),
             )
             for case in cases
@@ -384,7 +546,9 @@ def outcome_preflight(
 @app.command("outcome-report")
 def outcome_report(
     config: Path = typer.Option(Path("configs/phase1.corrected.pilot-v14.yaml"), exists=True),
-    source_database: Path = typer.Option(Path("data/phase1/corrected/pilot-v14/runs.sqlite"), exists=True),
+    source_database: Path = typer.Option(
+        Path("data/phase1/corrected/pilot-v14/runs.sqlite"), exists=True
+    ),
     judge_database: Path = typer.Option(OUTCOME_DIR / "judgments.sqlite", exists=True),
     rubric: Path = typer.Option(OUTCOME_RUBRIC, exists=True),
     calibration: Path = typer.Option(OUTCOME_DIR / "calibration.json", exists=True),
@@ -396,13 +560,18 @@ def outcome_report(
     experiment_config = ExperimentConfig.load(config)
     try:
         private_values = load_env_file(
-            experiment_config.root / experiment_config.inference.get("env_file", ".env.uni-gpu.local")
+            experiment_config.root
+            / experiment_config.inference.get("env_file", ".env.uni-gpu.local")
         )
         pinned = json.loads(
-            (experiment_config.root / experiment_config.inference["manifest"]).read_text(encoding="utf-8")
+            (experiment_config.root / experiment_config.inference["manifest"]).read_text(
+                encoding="utf-8"
+            )
         )
     except Exception as exc:
-        console.print(f"Outcome report failed: {type(exc).__name__}: required local inference manifest is unavailable")
+        console.print(
+            f"Outcome report failed: {type(exc).__name__}: required local inference manifest is unavailable"
+        )
         raise typer.Exit(code=2) from None
     secrets = tuple(
         value
@@ -523,11 +692,13 @@ def outcome_report_v8_command(
             (experiment.root / experiment.inference["manifest"]).read_text(encoding="utf-8")
         )
         secrets = tuple(
-            value for value in (
+            value
+            for value in (
                 private.get("INDIC_UNI_GPU_BASE_URL"),
                 private.get("INDIC_UNI_GPU_API_KEY"),
                 pinned.get("resolved_model"),
-            ) if isinstance(value, str) and value
+            )
+            if isinstance(value, str) and value
         )
         directory = experiment.root / output
         report = build_v8_tables(

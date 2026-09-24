@@ -1,0 +1,75 @@
+# Frozen one-attempt Phase I main study. Private run data stays under ignored data/.
+experiment:
+  id: phase1_corrected_main24_v1
+  name: phase1_corrected_main24_v1
+  version: corrected-v16-main24-llm-outcome-v2
+  dataset_manifest: benchmark/task_selection.v13.yaml
+  translations_manifest: benchmark/translations/phase1.v13.yaml
+  prepared_tasks_root: data/phase1/tasks-v13
+  agents_manifest: configs/agents.pilot-v14.yaml
+  models_manifest: configs/models.yaml
+  seed: 1701
+  repetitions: 1
+  languages: [english, hindi, hinglish]
+  tasks:
+    - 016-code-repair-pytest
+    - 039-repo-architecture-map
+    - 040-test-coverage-fill
+    - 042-api-schema-migration
+    - 043-db-migration-safety
+    - 087-cli-parser-bug-tests
+    - 049-excel-like-cleaning
+    - 050-multitable-join-analysis
+    - 051-sql-query-report
+    - 053-anomalous-transaction-detect
+    - 054-budget-variance-analysis
+    - 001-file
+    - 020-archive-checksum
+    - 021-batch-rename-transform
+    - 079-smallfile-batch-reject-ledger
+    - 004-meeting-summary
+    - 005-email-triage
+    - 025-meeting-action-tracker
+    - 028-email-thread-merge
+    - 012-doc-synthesis
+    - 033-offline-knowledge-qa
+    - 035-conflicting-source-resolution
+    - 019-incident-runbook-synthesis
+    - 068-product-launch-ops
+  agents: [react, nanobot, openclaw]
+  models: [university_gpu]
+
+generation:
+  temperature: 0.0
+  top_p: 1.0
+  max_tokens: 8192
+  max_steps: 40
+
+sandbox:
+  mode: docker
+  image: indic-harness-phase1:pilot-v13
+  network: none
+
+inference:
+  provider: university_gpu
+  env_file: .env.uni-gpu.local
+  requested_model_env: INDIC_UNI_GPU_MODEL
+  manifest: data/phase1/corrected/main24-v1/model-manifest.json
+  runtime_manifest: data/phase1/corrected/pilot-v14-runtime-manifest.json
+  calibration_manifest: data/phase1/corrected/pilot-v14-calibration.json
+  calibration_source_experiment: phase1_corrected_pilot_v14
+  outcome_rubric: configs/outcome-rubric.main24-v1.yaml
+  timeout_seconds: 90
+  max_retries: 2
+  proxy:
+    enabled: true
+    public_model: phase1-university-model
+    max_calls_per_cell: 40
+    image: indic-harness-proxy:pilot-v14
+    egress_network: bridge
+
+storage:
+  experiment_dir: data/phase1/corrected/main24-v1
+  database: data/phase1/corrected/main24-v1/runs.sqlite
+  traces_dir: data/phase1/corrected/main24-v1/traces
+  results_dir: data/phase1/corrected/main24-v1/results

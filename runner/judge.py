@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import re
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -191,9 +192,13 @@ class ProcessJudge:
         try:
             user = template.format(task_name=task_id, task_prompt=task_prompt, payload=payload)
         except (KeyError, IndexError):
-            user = RUBRIC_TEMPLATE.format(task_name=task_id, task_prompt=task_prompt, payload=payload)
+            user = RUBRIC_TEMPLATE.format(
+                task_name=task_id, task_prompt=task_prompt, payload=payload
+            )
             rubric_source = "runner.judge.fallback_format"
-        input_text = json.dumps({"system": system, "user": user}, ensure_ascii=False, sort_keys=True)
+        input_text = json.dumps(
+            {"system": system, "user": user}, ensure_ascii=False, sort_keys=True
+        )
         response = self.client.chat.completions.create(
             model=self.model_config["model"],
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -229,9 +234,7 @@ class ProcessJudge:
             status = "completed"
             process_score = sum(values.values()) / 3.0
             combined = (
-                outcome_score * process_score * security
-                if outcome_score is not None
-                else None
+                outcome_score * process_score * security if outcome_score is not None else None
             )
         return {
             "status": status,
@@ -257,10 +260,26 @@ def judge_database(
     max_tokens: int = 2048,
     proxy: Any | None = None,
     rerun: bool = False,
+    outcome_database: Path | None = None,
 ) -> dict[str, int]:
     store = RunStore(database)
     judge = ProcessJudge(model_config, max_tokens=max_tokens)
     counts = {"completed": 0, "invalid": 0, "missing": 0}
+    outcome_scores: dict[str, float] | None = None
+    if outcome_database is not None:
+        uri = outcome_database.resolve().as_uri() + "?mode=ro"
+        outcome_store = sqlite3.connect(uri, uri=True)
+        try:
+            outcome_rows = outcome_store.execute(
+                "SELECT cell_id,outcome_score,status FROM judgment"
+            ).fetchall()
+        finally:
+            outcome_store.close()
+        outcome_scores = {
+            str(cell_id): float(score)
+            for cell_id, score, status in outcome_rows
+            if status == "completed" and score is not None
+        }
     try:
         rows = store.rows(experiment_id)
         for row in rows:
@@ -274,18 +293,21 @@ def judge_database(
                 continue
             trace_path = Path(row.get("trace_path") or "")
             if not trace_path.is_file():
-                store.add_process_grade(row["run_id"], {"status": "missing", "error": "trace missing"})
+                store.add_process_grade(
+                    row["run_id"], {"status": "missing", "error": "trace missing"}
+                )
                 counts["missing"] += 1
                 continue
-            trace = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()]
+            trace = [
+                json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()
+            ]
             task_source = task_root / row["task_id"] / "source"
             prompt_path = task_source / "prompt.txt"
             prompt = prompt_path.read_text(encoding="utf-8") if prompt_path.is_file() else ""
-            grade_row = store.connection.execute(
-                "SELECT score, details FROM grade WHERE run_id = ? AND test_name = 'task_grader' LIMIT 1",
-                (row["run_id"],),
-            ).fetchone()
-            outcome = float(grade_row[0]) if grade_row and grade_row[0] is not None else None
+            if outcome_scores is not None:
+                outcome = outcome_scores.get(str(row.get("cell_id") or row["run_id"]))
+            else:
+                outcome = None
             try:
                 if proxy is not None:
                     proxy.begin_cell(f"judge:{row['run_id']}")
@@ -306,7 +328,9 @@ def judge_database(
                 if proxy is not None:
                     proxy.end_cell()
             store.add_process_grade(row["run_id"], result)
-            counts[result.get("status", "invalid")] = counts.get(result.get("status", "invalid"), 0) + 1
+            counts[result.get("status", "invalid")] = (
+                counts.get(result.get("status", "invalid"), 0) + 1
+            )
             store.commit()
     finally:
         judge.close()

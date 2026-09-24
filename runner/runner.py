@@ -295,7 +295,9 @@ class ExperimentRunner:
             for row in rows
             if row["status"] == "completed"
             and self.store.connection.execute(
-                "SELECT 1 FROM grade WHERE run_id = ? LIMIT 1", (row["run_id"],)
+                "SELECT 1 FROM grade WHERE run_id = ? AND test_name = 'task_grader' "
+                "AND status = 'completed' AND score IS NOT NULL LIMIT 1",
+                (row["run_id"],),
             ).fetchone()
         )
         infrastructure = sum(1 for row in rows if row["status"] == "infrastructure_error")
@@ -325,7 +327,8 @@ class ExperimentRunner:
         final_attempt_id: str | None = None
         attempts_made = 0
 
-        for retry_index in range(max_retries + 1):
+        remaining_attempts = max(0, max_retries + 1 - previous_attempts)
+        for retry_index in range(remaining_attempts):
             attempt_no = previous_attempts + retry_index + 1
             attempts_made += 1
             attempt_id = f"{cell.cell_id}-attempt-{attempt_no}"
@@ -860,6 +863,19 @@ class ExperimentRunner:
                 name: hashlib.sha256((self.config.root / path).read_bytes()).hexdigest()
                 for name, path in paths.items()
             }
+            outcome_rubric = self.config.inference.get("outcome_rubric")
+            if isinstance(outcome_rubric, str) and outcome_rubric:
+                data["frozen_sha256"]["outcome_rubric"] = hashlib.sha256(
+                    (self.config.root / outcome_rubric).read_bytes()
+                ).hexdigest()
+                data["frozen_sha256"]["hybrid_outcome"] = hashlib.sha256(
+                    (self.config.root / "runner/hybrid_outcome.py").read_bytes()
+                ).hexdigest()
+                supervisor_path = self.config.root / "scripts/run_main24_supervisor.py"
+                if supervisor_path.is_file():
+                    data["frozen_sha256"]["study_supervisor"] = hashlib.sha256(
+                        supervisor_path.read_bytes()
+                    ).hexdigest()
         return data
 
     def assert_experiment_identity(self) -> None:
