@@ -190,7 +190,7 @@ def run(
 def judge_main24_outcomes(
     config: Path = typer.Option(Path("configs/phase1.corrected.main24-v1.yaml"), exists=True),
     database: Path = typer.Option(Path("data/phase1/corrected/main24-v1/runs.sqlite"), exists=True),
-    output: Path = typer.Option(Path("data/phase1/corrected/main24-v1/outcomes-v3.sqlite")),
+    output: Path = typer.Option(Path("data/phase1/corrected/main24-v1/outcomes-v4.sqlite")),
     expected_cells: int = typer.Option(216, min=1),
     experiment_id: str | None = typer.Option(None, "--experiment-id"),
 ) -> None:
@@ -228,7 +228,7 @@ def judge_main24_outcomes(
 @app.command("calibrate-main24-outcomes")
 def calibrate_main24_outcomes(
     config: Path = typer.Option(Path("configs/phase1.corrected.main24-v1.yaml"), exists=True),
-    output: Path = typer.Option(Path("data/phase1/corrected/main24-v1/calibration-v3.sqlite")),
+    output: Path = typer.Option(Path("data/phase1/corrected/main24-v1/calibration-v4.sqlite")),
 ) -> None:
     """Run the frozen reference-guided outcome controls and save their status."""
     runtime = None

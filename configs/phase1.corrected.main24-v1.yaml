@@ -2,7 +2,7 @@
 experiment:
   id: phase1_corrected_main24_v1
   name: phase1_corrected_main24_v1
-  version: corrected-v17-main24-llm-outcome-v3
+  version: corrected-v18-main24-llm-outcome-v4
   dataset_manifest: benchmark/task_selection.v13.yaml
   translations_manifest: benchmark/translations/phase1.v13.yaml
   prepared_tasks_root: data/phase1/tasks-v13

@@ -75,6 +75,35 @@ def test_semantic_judge_cannot_cite_reference_or_unknown_files() -> None:
         )
 
 
+def test_response_accepts_observed_score_justification_aliases_with_path_evidence() -> None:
+    level, reason = _validate_response(
+        json.dumps(
+            {
+                "score": 4,
+                "justification": "The required count is in `out/linecount.txt`.",
+            }
+        ),
+        {"out/linecount.txt"},
+    )
+    assert level == 4
+    assert "out/linecount.txt" in reason
+
+
+def test_response_rejects_conflicting_alias_fields() -> None:
+    with pytest.raises(HybridOutcomeError, match="conflicting level and score"):
+        _validate_response(
+            json.dumps(
+                {
+                    "level": 4,
+                    "score": 2,
+                    "reason": "x",
+                    "submitted_evidence_paths": ["out/result.txt"],
+                }
+            ),
+            {"out/result.txt"},
+        )
+
+
 @pytest.mark.parametrize(("level", "expected"), [(4, 1.0), (2, 0.5), (0, 0.0)])
 def test_primary_score_is_llm_only(level: int, expected: float) -> None:
     assert primary_outcome_score(level) == pytest.approx(expected)

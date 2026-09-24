@@ -14,7 +14,7 @@ from typing import Any
 
 from runner.outcome_judge import read_workspace_archive
 
-VERSION = "phase1-main24-llm-judge-v3"
+VERSION = "phase1-main24-llm-judge-v4"
 SCHEMA = """
 PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -330,11 +330,19 @@ def _validate_response(content: str, submitted_paths: set[str]) -> tuple[int, st
         value = json.loads(content)
     except json.JSONDecodeError as exc:
         raise HybridOutcomeError("Judge response is not valid JSON") from exc
-    if not isinstance(value, dict) or isinstance(value.get("level"), bool):
+    if not isinstance(value, dict):
         raise HybridOutcomeError("Judge response must contain an integer level")
-    level = value.get("level")
-    reason = value.get("reason")
+    if "level" in value and "score" in value and value["level"] != value["score"]:
+        raise HybridOutcomeError("Judge returned conflicting level and score fields")
+    if "reason" in value and "justification" in value and value["reason"] != value["justification"]:
+        raise HybridOutcomeError("Judge returned conflicting reason and justification fields")
+    level = value.get("level", value.get("score"))
+    reason = value.get("reason", value.get("justification"))
+    if isinstance(level, bool):
+        raise HybridOutcomeError("Judge level must be an integer from 0 to 4")
     evidence = value.get("submitted_evidence_paths")
+    if evidence is None and isinstance(reason, str):
+        evidence = [path for path in submitted_paths if path in reason]
     if not isinstance(level, int) or level not in range(5):
         raise HybridOutcomeError("Judge level must be an integer from 0 to 4")
     if not isinstance(reason, str) or not reason.strip() or len(reason) > 1200:
@@ -411,8 +419,14 @@ def _semantic_call(
                     {
                         "role": "system",
                         "content": (
-                            "You are a blinded evaluator. Return JSON only; do not reveal "
-                            "private reasoning."
+                            "You are a blinded evaluator. Return exactly one JSON object with "
+                            'integer field "level" from 0 to 4, string field "reason", and '
+                            'string-array field "submitted_evidence_paths" listing exact '
+                            "submitted file paths supporting credit. Example: "
+                            '{"level":4,"reason":"The output meets the requirement.",'
+                            '"submitted_evidence_paths":["out/result.txt"]}. Do not use '
+                            'fields named "score" or "justification". Do not reveal private '
+                            "reasoning."
                         ),
                     },
                     {"role": "user", "content": prompt},
@@ -823,7 +837,7 @@ def judge_database(
         **_frozen_identity(task_root, runtime, rubric_path),
     }
     calibration_path = (
-        task_root.parent.parent.parent / "data/phase1/corrected/main24-v1/calibration-v3.json"
+        task_root.parent.parent.parent / "data/phase1/corrected/main24-v1/calibration-v4.json"
     )
     if not calibration_path.is_file():
         raise HybridOutcomeError("Main24 judge calibration is missing; outcome judging is blocked")
