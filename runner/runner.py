@@ -7,7 +7,7 @@ import tarfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from time import monotonic
+from time import monotonic, sleep
 from types import SimpleNamespace
 from typing import Any
 
@@ -28,6 +28,7 @@ from runner.proxy import InferenceProxy
 from runner.proxy_sidecar import ProxySidecar
 from runner.redaction import redact
 from runner.sandbox import SandboxInfrastructureError, WorkspaceSandbox
+from runner.study_journal import append_journal, write_heartbeat
 
 
 SYSTEM_PROMPT = (
@@ -221,8 +222,27 @@ class ExperimentRunner:
         *,
         resume: bool = True,
         max_cells: int | None = None,
+        selected_cell_ids: set[str] | None = None,
+        ordered_cell_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        cells = self.plan_cells(tasks)
+        all_cells = self.plan_cells(tasks)
+        all_cell_ids = {cell.cell_id for cell in all_cells}
+        if selected_cell_ids is not None and not selected_cell_ids.issubset(all_cell_ids):
+            raise ValueError("Selected run block contains cells outside the frozen experiment matrix")
+        cells = (
+            [cell for cell in all_cells if cell.cell_id in selected_cell_ids]
+            if selected_cell_ids is not None
+            else list(all_cells)
+        )
+        if ordered_cell_ids is not None:
+            if (
+                len(ordered_cell_ids) != len(cells)
+                or len(ordered_cell_ids) != len(set(ordered_cell_ids))
+                or set(ordered_cell_ids) != {cell.cell_id for cell in cells}
+            ):
+                raise ValueError("Execution order must contain every selected cell exactly once")
+            cell_map = {cell.cell_id: cell for cell in cells}
+            cells = [cell_map[cell_id] for cell_id in ordered_cell_ids]
         experiment = self.config.experiment
         self.store.ensure_experiment(
             self.config.experiment_id,
@@ -254,19 +274,88 @@ class ExperimentRunner:
             )
         self.store.commit()
 
-        cells = self._execution_order(cells, int(experiment.get("seed", 0)))
+        if ordered_cell_ids is None:
+            cells = self._execution_order(cells, int(experiment.get("seed", 0)))
         results: list[dict[str, Any]] = []
         processed = 0
         for cell in cells:
             row = self.store.get_cell(cell.cell_id)
-            if resume and row is not None and row["status"] == "completed":
+            if resume and row is not None and row["status"] in {"completed", "infrastructure_error"}:
                 results.append(self._result_from_row(row))
                 continue
             if max_cells is not None and processed >= max_cells:
                 continue
-            results.append(self._run_cell(cell))
+            self._wait_for_pinned_model(cell.cell_id)
+            heartbeat = self._heartbeat_path()
+            if heartbeat is not None:
+                write_heartbeat(
+                    heartbeat,
+                    experiment_id=self.config.experiment_id,
+                    state="cell_running",
+                    cell_id=cell.cell_id,
+                    task_id=cell.task.task_id,
+                    language=cell.language,
+                    harness=cell.agent,
+                )
+            result = self._run_cell(cell)
+            results.append(result)
+            if heartbeat is not None:
+                write_heartbeat(
+                    heartbeat,
+                    experiment_id=self.config.experiment_id,
+                    state="cell_checkpoint",
+                    cell_id=cell.cell_id,
+                    task_id=cell.task.task_id,
+                    language=cell.language,
+                    harness=cell.agent,
+                    cell_status=result["status"],
+                    success=result.get("success"),
+                )
             processed += 1
         return results
+
+    def _heartbeat_path(self) -> Path | None:
+        relative = self.config.storage.get("heartbeat")
+        return self.config.root / relative if isinstance(relative, str) else None
+
+    def _wait_for_pinned_model(self, cell_id: str) -> None:
+        # Local/fake-model tests and non-university experiments have no upstream
+        # identity to pin. In particular, do not make their execution depend on
+        # storage paths or proxy health-journal settings.
+        if self.config.inference.get("provider") != "university_gpu" or not self.proxies:
+            return
+        interval = max(30, int(self.config.inference.get("health_check_interval_seconds", 300)))
+        journal_relative = self.config.storage.get("journal")
+        if not isinstance(journal_relative, str) or not journal_relative:
+            experiment_dir = self.config.storage.get("experiment_dir", "data")
+            journal_relative = f"{experiment_dir}/journal.jsonl"
+        journal_path = self.config.root / journal_relative
+        heartbeat_path = self._heartbeat_path()
+        for proxy in self.proxies.values():
+            while True:
+                try:
+                    proxy.verify_upstream_identity(
+                        int(self.config.inference.get("timeout_seconds", 90))
+                    )
+                    break
+                except InferenceTransientError as exc:
+                    event = {
+                        "experiment_id": self.config.experiment_id,
+                        "state": "paused_for_endpoint",
+                        "cell_id": cell_id,
+                        "error_type": type(exc).__name__,
+                        "next_health_check_seconds": interval,
+                    }
+                    if heartbeat_path is not None:
+                        write_heartbeat(heartbeat_path, **event)
+                    append_journal(journal_path, **event)
+                    sleep(interval)
+                    append_journal(
+                        journal_path,
+                        experiment_id=self.config.experiment_id,
+                        state="health_check_resumed",
+                        cell_id=cell_id,
+                    )
 
     @staticmethod
     def _execution_order(cells: list[Cell], seed: int) -> list[Cell]:
@@ -561,6 +650,9 @@ class ExperimentRunner:
                     temperature=float(self.config.generation.get("temperature", 0.0)),
                     top_p=float(self.config.generation.get("top_p", 1.0)),
                     max_tokens=int(self.config.generation.get("max_tokens", 2048)),
+                    max_tool_result_bytes=int(
+                        self.config.inference.get("max_tool_result_bytes", 0)
+                    ),
                 ).start()
                 agent_model_config = sidecar.model_config(model_config)
             try:
@@ -817,9 +909,9 @@ class ExperimentRunner:
             "dataset_manifest", "benchmark/task_selection.yaml"
         )
         try:
-            import yaml
+            from runner.yaml_config import load_yaml_mapping
 
-            data = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+            data = load_yaml_mapping(manifest_path, label="task selection manifest")
             return str(data.get("source", {}).get("revision", "unknown"))
         except (OSError, ValueError):
             return "unknown"
@@ -829,9 +921,13 @@ class ExperimentRunner:
             "dataset_manifest", "benchmark/task_selection.yaml"
         )
         try:
-            import yaml
+            from runner.yaml_config import load_yaml_mapping
 
-            return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            manifest = load_yaml_mapping(path, label="task selection manifest")
+            from runner.study_identity import prepared_task_hashes
+
+            manifest["prepared_task_hashes"] = prepared_task_hashes(self.config.task_root)
+            return manifest
         except (OSError, ValueError):
             return {"path": str(path)}
 
@@ -858,6 +954,15 @@ class ExperimentRunner:
                 "grader": "runner/grader.py",
                 "judge": "runner/judge.py",
                 "upstream": "benchmark/upstream.py",
+                "yaml_loader": "runner/yaml_config.py",
+                "grade_access": "runner/grade_access.py",
+                "study_identity": "runner/study_identity.py",
+                "study_journal": "runner/study_journal.py",
+                "hybrid_outcome": "runner/hybrid_outcome.py",
+                "main24_calibration": "runner/main24_calibration.py",
+                "outcome_judge": "runner/outcome_judge.py",
+                "outcome_calibration": "runner/outcome_calibration.py",
+                "outcome_runtime": "runner/outcome_v2.py",
             }
             data["frozen_sha256"] = {
                 name: hashlib.sha256((self.config.root / path).read_bytes()).hexdigest()
@@ -871,7 +976,15 @@ class ExperimentRunner:
                 data["frozen_sha256"]["hybrid_outcome"] = hashlib.sha256(
                     (self.config.root / "runner/hybrid_outcome.py").read_bytes()
                 ).hexdigest()
-                supervisor_path = self.config.root / "scripts/run_main24_supervisor.py"
+                artifact_contract = self.config.experiment.get("artifact_contract")
+                if isinstance(artifact_contract, str) and artifact_contract:
+                    data["frozen_sha256"]["artifact_contract"] = hashlib.sha256(
+                        (self.config.root / artifact_contract).read_bytes()
+                    ).hexdigest()
+                supervisor_relative = self.config.inference.get(
+                    "supervisor", "scripts/run_main24_supervisor.py"
+                )
+                supervisor_path = self.config.root / supervisor_relative
                 if supervisor_path.is_file():
                     data["frozen_sha256"]["study_supervisor"] = hashlib.sha256(
                         supervisor_path.read_bytes()

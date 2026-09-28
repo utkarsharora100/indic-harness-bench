@@ -1,0 +1,7 @@
+agents:
+  openclaw:
+    type: native
+    image: indic-harness-openclaw:pilot-v13
+    release: "2026.9.5"
+    command: ["openclaw", "agent", "--local", "--message-file", "{message_file}", "--model", "{model}", "--session-id", "{session}", "--thinking", "off", "--timeout", "{timeout}", "--json"]
+    network: phase1-agent-net

@@ -4,6 +4,7 @@ import json
 import re
 import secrets
 import threading
+import copy
 from datetime import datetime, timezone
 import urllib.error
 import urllib.request
@@ -14,6 +15,10 @@ from urllib.parse import urlsplit
 
 class ModelProxyError(RuntimeError):
     """The local model proxy could not be started or reached its upstream."""
+
+
+class ModelIdentityDriftError(ModelProxyError):
+    """The upstream no longer serves the model frozen for this experiment."""
 
 
 class InferenceProxy:
@@ -36,6 +41,7 @@ class InferenceProxy:
         temperature: float = 0.0,
         top_p: float = 1.0,
         max_tokens: int = 2048,
+        max_tool_result_bytes: int = 0,
         bind_host: str = "0.0.0.0",
         listen_port: int = 0,
         advertised_host: str | None = None,
@@ -52,6 +58,7 @@ class InferenceProxy:
         self.temperature = temperature
         self.top_p = top_p
         self.max_tokens = max_tokens
+        self.max_tool_result_bytes = max(0, int(max_tool_result_bytes))
         self.client_key = client_key or "phase1-" + secrets.token_urlsafe(18)
         self.bind_host = bind_host
         self.listen_port = listen_port
@@ -149,11 +156,20 @@ class InferenceProxy:
                 if not isinstance(payload, dict):
                     self._write_json(400, {"error": "body_must_be_object"})
                     return
+                observable_payload = copy.deepcopy(payload)
                 validation_error = proxy._validate_payload(payload)
                 if validation_error is not None:
                     self._write_json(400, {"error": validation_error})
                     return
                 proxy._normalize_payload(payload)
+                if proxy.max_tool_result_bytes:
+                    capped_count, removed_bytes = proxy._cap_tool_result_messages(payload)
+                    if capped_count:
+                        observable_payload["phase1_tool_result_cap"] = {
+                            "max_bytes_per_message": proxy.max_tool_result_bytes,
+                            "messages_capped": capped_count,
+                            "bytes_omitted_from_model_context": removed_bytes,
+                        }
                 with proxy._trace_lock:
                     if proxy._active_trace is None:
                         self._write_json(409, {"error": "cell_not_started"})
@@ -169,19 +185,33 @@ class InferenceProxy:
                 requested_model = payload.get("model")
                 payload["model"] = proxy.resolved_model
                 proxy._forward_count()
-                self._forward(payload, observable_model=requested_model)
+                self._forward(
+                    payload,
+                    observable_model=requested_model,
+                    observed_payload=observable_payload,
+                )
 
             def _forward(
                 self,
                 payload: dict[str, Any] | None,
                 *,
                 observable_model: Any = None,
+                observed_payload: dict[str, Any] | None = None,
             ) -> None:
                 body = json.dumps(payload, ensure_ascii=False).encode("utf-8") if payload is not None else None
                 if payload is not None:
+                    observed = copy.deepcopy(observed_payload or payload)
+                    # Trace the effective frozen generation settings while
+                    # retaining the original, uncapped tool output as evidence.
+                    for key in ("temperature", "top_p", "max_tokens", "stream", "stream_options"):
+                        if key in payload:
+                            observed[key] = copy.deepcopy(payload[key])
                     proxy._record_proxy_event(
                         "request",
-                        {**payload, "model": observable_model or proxy.public_model},
+                        {
+                            **observed,
+                            "model": observable_model or proxy.public_model,
+                        },
                     )
                 request = urllib.request.Request(
                     proxy._target_for(self.path),
@@ -351,6 +381,35 @@ class InferenceProxy:
                 payload["stream_options"] = options
             options["include_usage"] = True
 
+    def _cap_tool_result_messages(self, payload: dict[str, Any]) -> tuple[int, int]:
+        """Bound tool-result bytes entering the model while tracing full input."""
+        messages = payload.get("messages")
+        if not isinstance(messages, list):
+            return 0, 0
+        capped = 0
+        removed = 0
+        marker = "\n[tool result shortened for context; full result is retained in the run trace/workspace]"
+        marker_bytes = marker.encode("utf-8")
+        for message in messages:
+            if not isinstance(message, dict) or message.get("role") != "tool":
+                continue
+            content = message.get("content")
+            if not isinstance(content, str):
+                continue
+            raw = content.encode("utf-8")
+            if len(raw) <= self.max_tool_result_bytes:
+                continue
+            if self.max_tool_result_bytes <= len(marker_bytes):
+                replacement = marker_bytes[: self.max_tool_result_bytes].decode("utf-8", errors="ignore")
+            else:
+                prefix_size = self.max_tool_result_bytes - len(marker_bytes)
+                prefix = raw[:prefix_size].decode("utf-8", errors="ignore")
+                replacement = prefix + marker
+            message["content"] = replacement
+            capped += 1
+            removed += max(0, len(raw) - len(replacement.encode("utf-8")))
+        return capped, removed
+
     @staticmethod
     def _observable_request(payload: dict[str, Any]) -> dict[str, Any]:
         messages = []
@@ -374,6 +433,7 @@ class InferenceProxy:
             "max_tokens": payload.get("max_tokens"),
             "stream": payload.get("stream"),
             "stream_options": payload.get("stream_options"),
+            "phase1_tool_result_cap": payload.get("phase1_tool_result_cap"),
         }
 
     @staticmethod
@@ -481,3 +541,16 @@ class InferenceProxy:
             self.thread.join(timeout=2)
         self.server = None
         self.thread = None
+
+    def verify_upstream_identity(self, timeout_seconds: int = 30) -> None:
+        """Cheaply verify model pinning via /models without consuming inference calls."""
+        from runner.inference import list_models, model_id
+
+        served = {
+            model_id(item)
+            for item in list_models(self.upstream_base_url, self.upstream_key, timeout_seconds)
+        }
+        if self.resolved_model not in served:
+            raise ModelIdentityDriftError(
+                "University endpoint no longer serves the frozen model identity"
+            )

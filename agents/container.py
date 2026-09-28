@@ -108,6 +108,16 @@ class ContainerHarnessAdapter:
                                 "defaults": {
                                     "workspace": "/workspace",
                                     "model": {"primary": f"phase1/{request.model}"},
+                                    "compaction": {
+                                        "mode": "safeguard",
+                                        "midTurnPrecheck": {"enabled": True},
+                                        "keepRecentTokens": 6000,
+                                        "recentTurnsPreserve": 3,
+                                        "identifierPolicy": "strict",
+                                        "qualityGuard": {"enabled": False, "maxRetries": 0},
+                                        "memoryFlush": {"enabled": False},
+                                        "maxActiveTranscriptBytes": 40000,
+                                    },
                                 },
                                 "entries": {
                                     "main": {

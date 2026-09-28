@@ -43,8 +43,9 @@ def test_packet_separates_reference_from_actual_submission(tmp_path: Path) -> No
         None,
     )
     assert packet["reference_answer_not_agent_work"]["facts"] == {"answer": "gold"}
-    assert packet["submitted_workspace"][0]["content"] == "submitted"
-    assert "gold" not in packet["submitted_workspace"][0]["content"]
+    submission = next(item for item in packet["submitted_workspace"] if item["path"] == "out/summary.md")
+    assert submission["content"] == "submitted"
+    assert "gold" not in submission["content"]
     assert packet["fixture_integrity"][0]["path"] == "in/input.txt"
     assert packet["fixture_integrity"][0]["status"] == "modified"
 
@@ -58,10 +59,11 @@ def test_missing_submitted_deliverable_is_not_inferred_from_reference(tmp_path: 
     packet = _packet("004-meeting-summary", source, {}, None)
     assert packet["reference_answer_not_agent_work"]["facts"]["summary"] == "correct"
     assert packet["submitted_workspace"] == []
+    absence_id = packet["absence_observations"][0]["evidence_id"]
     with pytest.raises(HybridOutcomeError, match="missing deliverable"):
         _validate_response(
-            json.dumps({"level": 4, "reason": "answer key exists", "submitted_evidence_paths": []}),
-            set(),
+            json.dumps({"level": 4, "reason": "answer key exists", "evidence_ids": [absence_id]}),
+            {absence_id: "absence"},
         )
 
 
@@ -69,24 +71,26 @@ def test_semantic_judge_cannot_cite_reference_or_unknown_files() -> None:
     with pytest.raises(HybridOutcomeError, match="unknown submitted artifact"):
         _validate_response(
             json.dumps(
-                {"level": 4, "reason": "supported", "submitted_evidence_paths": ["reference.json"]}
+                {"level": 4, "reason": "supported", "evidence_ids": ["reference.json"]}
             ),
-            {"out/answer.md"},
+            {"SUB001": "text"},
         )
 
 
-def test_response_accepts_observed_score_justification_aliases_with_path_evidence() -> None:
-    level, reason = _validate_response(
+def test_response_accepts_unambiguous_score_alias_with_explicit_evidence_id() -> None:
+    level, reason, evidence = _validate_response(
         json.dumps(
             {
                 "score": 4,
-                "justification": "The required count is in `out/linecount.txt`.",
+                "justification": "The required count is present in the submitted artifact.",
+                "evidence_ids": ["SUB001"],
             }
         ),
-        {"out/linecount.txt"},
+        {"SUB001": "text"},
     )
     assert level == 4
-    assert "out/linecount.txt" in reason
+    assert "submitted artifact" in reason
+    assert evidence == ["SUB001"]
 
 
 def test_response_rejects_conflicting_alias_fields() -> None:
@@ -97,7 +101,7 @@ def test_response_rejects_conflicting_alias_fields() -> None:
                     "level": 4,
                     "score": 2,
                     "reason": "x",
-                    "submitted_evidence_paths": ["out/result.txt"],
+                    "evidence_ids": ["SUB001"],
                 }
             ),
             {"out/result.txt"},
@@ -114,8 +118,8 @@ def test_llm_only_score_rejects_out_of_range_values() -> None:
         primary_outcome_score(5)
 
 
-def test_empty_workspace_gets_zero_even_if_oracle_rewards_unchanged_fixtures() -> None:
-    assert primary_outcome_score(4, has_submission=False) == 0.0
+def test_primary_arithmetic_does_not_replace_the_llm_rating_for_missing_work() -> None:
+    assert primary_outcome_score(4) == 1.0
 
 
 def test_frozen_main24_configuration_is_the_exact_216_cell_matrix() -> None:
@@ -175,7 +179,7 @@ def test_semantic_transport_records_usage_and_proxy_events(tmp_path: Path) -> No
                             {
                                 "level": 3,
                                 "reason": "The submitted result matches the reference.",
-                                "submitted_evidence_paths": ["out/result.md"],
+                                    "evidence_ids": ["SUB001"],
                             }
                         )
                     },
@@ -198,20 +202,28 @@ def test_semantic_transport_records_usage_and_proxy_events(tmp_path: Path) -> No
             "proxy": Proxy(),
             "judge": type("Judge", (), {"client": Client()})(),
             "model_config": {"model": "public-alias"},
+            "secrets": (),
         },
     )()
     store = open_store(tmp_path / "calls.sqlite", {"version": "test"})
     try:
-        level, reason, usage = _semantic_call(
+        level, reason, evidence_ids, usage = _semantic_call(
             subject_id="cell",
             prompt="test",
-            submitted_paths={"out/result.md"},
+            evidence_index={"SUB001": "text"},
             runtime=runtime,
             store=store,
         )
         assert (level, reason) == (3, "The submitted result matches the reference.")
+        assert evidence_ids == ["SUB001"]
         assert usage == {"input_tokens": 10, "output_tokens": 3}
         assert store.execute("SELECT count(*) FROM call_attempt").fetchone()[0] == 1
         assert store.execute("SELECT count(*) FROM proxy_event").fetchone()[0] == 1
+        assert [
+            row[0]
+            for row in store.execute(
+                "SELECT event_type FROM call_event WHERE cell_id='cell' ORDER BY event_index"
+            )
+        ] == ["started", "response_received", "validated", "completed"]
     finally:
         store.close()

@@ -1,0 +1,78 @@
+version: main24-artifact-contract-v5
+tasks:
+  001-file:
+    required: [out/linecount.txt]
+    protected: [in/input.txt]
+  004-meeting-summary:
+    required: [out/meeting_summary.txt]
+    protected: [in/meeting_transcript.txt]
+  005-email-triage:
+    required: [out/triage.json, out/delete_ids.txt]
+    dynamic_reply_ids_from_reference: reply_required_ids
+    protected: [in/emails.json]
+  012-doc-synthesis:
+    required: [out/trustworthiness.json, out/contradictions.json, out/final_report.md]
+    protected: [in/doc1_news_site_a.md, in/doc2_news_site_b.md, in/doc3_social_media.md, in/doc4_official_statement.md, in/doc5_expert_analysis.md]
+  016-code-repair-pytest:
+    required: [in/app/config_manager.py, out/progress.md]
+    protected: [in/app/test_config.py]
+  019-incident-runbook-synthesis:
+    required: [out/incident_report.json, out/rollback_plan.md, out/evidence_matrix.csv, out/status_update.md]
+    protected: [in/alerts.jsonl, in/change_log.md, in/services.csv, in/topology.json]
+  020-archive-checksum:
+    required: [out/manifest.json, out/mismatches.txt]
+    protected: [in/bundle_a.zip, in/bundle_b.tar, in/checksums.json]
+  021-batch-rename-transform:
+    required: [out/rename_log.csv, out/error_report.csv]
+    required_any: [out/normalized/*]
+    protected: [in/raw/*]
+  025-meeting-action-tracker:
+    required: [out/action_items.csv, out/owner_followups.md, out/merge_rationale.md]
+    protected: [in/transcript.txt, in/transcript_part2.txt, in/transcript_part3.txt, in/followup_emails.md, in/previous_actions.csv, in/project_dependencies.json]
+  028-email-thread-merge:
+    required: [out/thread_summary.json, out/reply_draft.txt]
+    protected: [in/emails/*]
+  033-offline-knowledge-qa:
+    required: [out/answers.json]
+    protected: [in/questions.json, in/docs/*]
+  035-conflicting-source-resolution:
+    required: [out/resolved_facts.json, out/uncertainties.md, out/conflict_matrix.csv, out/source_reliability.json, out/decision_log.md]
+    protected: [in/briefs/*]
+  039-repo-architecture-map:
+    required: [out/module_map.json, out/architecture.md, out/doc_code_discrepancies.csv, out/risk_register.csv, out/onboarding_plan.md]
+    protected: [in/repo/*]
+  040-test-coverage-fill:
+    required: [in/ordercalc/tests/TEST_INTENT.md]
+    required_any: [in/ordercalc/tests/*]
+    protected: [in/ordercalc/ordercalc/*]
+  042-api-schema-migration:
+    required: [in/schema_migration/client.py, in/schema_migration/conversion_audit.json]
+    protected: [in/schema_migration/old_schema.json, in/schema_migration/new_schema.json, in/schema_migration/migration_notes.md, in/schema_migration/pii_policy.md, in/schema_migration/sample_payloads.jsonl, in/schema_migration/tests/*]
+  043-db-migration-safety:
+    required: [in/db/migration.sql, in/db/preflight_report.md, in/db/rollback.sql, in/db/postcheck.sql, in/db/migration_report.md]
+    protected: [in/db/schema.sql, in/db/migration_policy.md]
+  049-excel-like-cleaning:
+    required: [out/cleaned_sales.csv, out/reject_ledger.csv, out/reject_summary.json, out/cleaning_report.md]
+    protected: [in/messy_sales.csv, in/customer_dictionary.csv, in/fx_rates.csv]
+  050-multitable-join-analysis:
+    required: [out/customer_metrics.csv, out/region_summary.json, out/reconciliation_audit.json, out/reconciliation_notes.md]
+    protected: [in/customers.csv, in/orders.csv, in/payments.csv, in/refunds.csv, in/fx_rates.csv, in/chargebacks.csv]
+  051-sql-query-report:
+    required: [out/query_results.json, out/analysis.md, out/query_audit.json]
+    protected: [in/schema_data.sql]
+  053-anomalous-transaction-detect:
+    required: [out/suspicious_transactions.csv, out/rule_audit.json, out/case_notes.md]
+    protected: [in/transactions.csv, in/rules.md]
+  054-budget-variance-analysis:
+    required: [out/variance_report.csv, out/department_rollup.csv, out/review_reasons.json, out/summary.md]
+    protected: [in/budget.csv, in/actuals.csv]
+  068-product-launch-ops:
+    required: [out/launch_plan.md, out/content_pack.json, out/launch_checklist.csv]
+    protected: [in/product.md, in/budget.csv, in/audience.json]
+  079-smallfile-batch-reject-ledger:
+    required: [out/index.csv, out/reject_ledger.csv, out/batch_summary.json]
+    required_any: [out/normalized/*]
+    protected: [in/normalization_rules.yaml, in/dropbox/*]
+  087-cli-parser-bug-tests:
+    required: [in/csvtool/csvtool/cli.py, in/csvtool/tests/test_cli_regression.py]
+    protected: [in/csvtool/tests/test_cli_existing.py, in/csvtool/samples/*]

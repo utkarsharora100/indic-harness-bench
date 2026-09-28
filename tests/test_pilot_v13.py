@@ -150,7 +150,12 @@ def test_experiment_resume_rejects_runtime_image_manifest_change(tmp_path: Path)
     for name in ("runner/runner.py", "agents/react.py", "agents/container.py",
                  "runner/proxy.py", "scripts/proxy_sidecar.py", "runner/grader.py",
                  "runner/judge.py", "benchmark/upstream.py", "runner/preflight.py",
-                 "scripts/calibrate_pilot_budget.py", "scripts/prepare_phase1.py"):
+                 "scripts/calibrate_pilot_budget.py", "scripts/prepare_phase1.py",
+                 "runner/yaml_config.py", "runner/grade_access.py",
+                 "runner/study_identity.py", "runner/study_journal.py",
+                 "runner/hybrid_outcome.py", "runner/outcome_judge.py",
+                 "runner/outcome_calibration.py", "runner/outcome_v2.py",
+                 "runner/main24_calibration.py"):
         path = tmp_path / name
         path.parent.mkdir(exist_ok=True)
         path.write_text("code", encoding="utf-8")
@@ -158,7 +163,12 @@ def test_experiment_resume_rejects_runtime_image_manifest_change(tmp_path: Path)
     runner.config = config
     runner.store = RunStore(data / "runs.sqlite")
     try:
-        runner.store.ensure_experiment(config.experiment_id, runner._safe_config(), {}, "now")
+        runner.store.ensure_experiment(
+            config.experiment_id,
+            runner._safe_config(),
+            runner._experiment_manifest(),
+            "now",
+        )
         runner.assert_experiment_identity()
         (data / "runtime.json").write_text("changed image ID", encoding="utf-8")
         with pytest.raises(ValueError, match="identity changed"):

@@ -190,7 +190,7 @@ import traceback
 from pathlib import Path
 
 task_dir = Path('/grader-source')
-workspace = Path('/workspace')
+workspace = Path('/grader-source/fixtures/workspace')
 oracle_path = task_dir / sys.argv[1]
 module_name = 'phase1_oracle'
 try:
@@ -214,13 +214,22 @@ except Exception as exc:
         with tempfile.TemporaryDirectory(prefix="ihb-grader-") as temporary:
             grader_workspace = Path(temporary) / "workspace"
             shutil.copytree(self.workspace, grader_workspace)
+            # Mirror the pinned task layout: upstream graders that derive
+            # ground_truth.json from workspace.parent.parent expect
+            # <task-source>/fixtures/workspace. Keep the source read-only and
+            # mount only the submitted workspace as writable inside the
+            # separate grader container.
+            grader_source = Path(temporary) / "task-source"
+            shutil.copytree(task_dir.resolve(), grader_source)
+            nested_workspace = grader_source / "fixtures" / "workspace"
+            nested_workspace.mkdir(parents=True, exist_ok=True)
             result = self._ephemeral_container(
                 ["python", "-c", oracle_script, oracle_module],
                 volumes={
-                    str(grader_workspace): {"bind": "/workspace", "mode": "rw"},
-                    str(task_dir.resolve()): {"bind": "/grader-source", "mode": "ro"},
+                    str(grader_workspace): {"bind": "/grader-source/fixtures/workspace", "mode": "rw"},
+                    str(grader_source): {"bind": "/grader-source", "mode": "ro"},
                 },
-                workdir="/workspace",
+                workdir="/grader-source/fixtures/workspace",
                 timeout_seconds=timeout_seconds,
                 # The oracle emits one structured JSON line. Preserve the
                 # complete output so a large checks list cannot truncate the

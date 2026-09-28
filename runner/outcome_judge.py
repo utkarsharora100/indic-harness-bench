@@ -13,10 +13,9 @@ from pathlib import Path, PurePosixPath
 from statistics import median
 from typing import Any
 
-import yaml
-
 from runner.outcome_contract import apply_contract, criterion_contract, reference_answer
 from runner.redaction import redact, redact_text
+from runner.yaml_config import load_yaml_mapping
 
 
 class OutcomeJudgeError(RuntimeError):
@@ -86,7 +85,7 @@ def utc_now() -> str:
 
 
 def load_rubric(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data = load_yaml_mapping(path, label="outcome rubric")
     if not isinstance(data, dict) or not isinstance(data.get("tasks"), dict):
         raise OutcomeJudgeError("Rubric must define a tasks mapping")
     for task_id, task in data["tasks"].items():
@@ -228,6 +227,7 @@ def load_source_cells(database: Path, experiment_id: str) -> list[SourceCell]:
                       pg.security_score, pg.process_score, pg.combined_score
                FROM run r
                LEFT JOIN grade g ON g.run_id=r.run_id AND g.kind='task'
+                 AND g.test_name='task_grader'
                LEFT JOIN process_grade pg ON pg.run_id=r.run_id
                WHERE r.experiment_id=? ORDER BY r.task_id,r.language,r.agent""",
             (experiment_id,),
@@ -306,8 +306,9 @@ def _safe_write_workspace(files: dict[str, bytes], root: Path) -> None:
         target.write_bytes(content)
 
 
-def run_code_test_evidence(files: dict[str, bytes], image: str) -> dict[str, Any]:
-    """Re-run task 016's public pytest command in an offline Docker grader."""
+def _run_workspace_pytest(
+    files: dict[str, bytes], image: str, command: str, workdir: str, timeout: int = 120
+) -> dict[str, Any]:
     from runner.sandbox import WorkspaceSandbox
 
     with tempfile.TemporaryDirectory(prefix="ihb-outcome-evidence-") as directory:
@@ -315,22 +316,91 @@ def run_code_test_evidence(files: dict[str, bytes], image: str) -> dict[str, Any
         initial.mkdir()
         _safe_write_workspace(files, initial)
         with WorkspaceSandbox(initial, image=image, mode="docker", network="none") as sandbox:
-            result = sandbox.run_grader_command(
-                "pytest -q app/test_config.py -p no:cacheprovider",
-                workdir="in",
-                timeout_seconds=120,
-            )
+            result = sandbox.run_grader_command(command, workdir=workdir, timeout_seconds=timeout)
     stdout = str(result.get("stdout", ""))
     stderr = str(result.get("stderr", ""))
     if len(stdout.encode("utf-8")) + len(stderr.encode("utf-8")) > 40_000:
-        raise OutcomeJudgeError("Independent task-016 test evidence exceeds its frozen size limit")
+        raise OutcomeJudgeError("Independent pytest evidence exceeds its frozen size limit")
     return {
-        "path": "validation/pytest.txt",
-        "kind": "validation_result",
-        "returncode": result["returncode"],
+        "returncode": result.get("returncode"),
         "timed_out": bool(result.get("timeout", False)),
         "stdout": stdout,
         "stderr": stderr,
+    }
+
+
+def run_code_test_evidence(
+    files: dict[str, bytes], image: str, task_source: Path | None = None
+) -> dict[str, Any]:
+    """Run pinned task-016 tests separately from any modified submitted tests."""
+    test_path = "in/app/test_config.py"
+    submitted = dict(files)
+    submitted_result = _run_workspace_pytest(
+        submitted, image, "pytest -q app/test_config.py -p no:cacheprovider", "in"
+    )
+    pinned_test = (
+        (task_source / "fixtures" / test_path).read_bytes()
+        if task_source is not None
+        else submitted.get(test_path)
+    )
+    if pinned_test is None:
+        raise OutcomeJudgeError("Pinned task-016 evaluator test file is missing")
+    pinned_files = dict(files)
+    pinned_files[test_path] = pinned_test
+    pinned_result = _run_workspace_pytest(
+        pinned_files, image, "pytest -q app/test_config.py -p no:cacheprovider", "in"
+    )
+    return {
+        "path": "validation/task016_pytest.json",
+        "kind": "validation_result",
+        "pinned_evaluator": pinned_result,
+        "submitted_suite": submitted_result,
+        "protected_test": {
+            "path": test_path,
+            "reference_sha256": sha256_bytes(pinned_test),
+            "submitted_sha256": (
+                sha256_bytes(files[test_path]) if test_path in files else None
+            ),
+            "unchanged": files.get(test_path) == pinned_test,
+        },
+    }
+
+
+def run_task_test_evidence(
+    files: dict[str, bytes],
+    image: str,
+    task_source: Path,
+    *,
+    pinned_test_path: str,
+    pinned_command: str,
+    submitted_command: str,
+    workdir: str,
+) -> dict[str, Any]:
+    """Compare a submission's suite with the immutable evaluator tests."""
+    baseline = task_source / "fixtures" / pinned_test_path
+    if not baseline.is_file():
+        raise OutcomeJudgeError(f"Pinned evaluator test is missing: {pinned_test_path}")
+    expected = baseline.read_bytes()
+    submitted_hash = (
+        sha256_bytes(files[pinned_test_path]) if pinned_test_path in files else None
+    )
+    pinned_files = dict(files)
+    pinned_files[pinned_test_path] = expected
+    return {
+        "path": "validation/pytest_evidence.json",
+        "kind": "validation_result",
+        "pinned_evaluator": _run_workspace_pytest(
+            pinned_files, image, pinned_command, workdir
+        ),
+        "submitted_suite": _run_workspace_pytest(
+            files, image, submitted_command, workdir
+        ),
+        "protected_test": {
+            "path": pinned_test_path,
+            "reference_sha256": sha256_bytes(expected),
+            "submitted_sha256": submitted_hash,
+            "unchanged": submitted_hash == sha256_bytes(expected),
+        },
     }
 
 
@@ -349,7 +419,7 @@ def make_evidence_packet(
     evidence = _text_evidence(files)
     validation = None
     if cell.task_id == "016-code-repair-pytest":
-        validation = run_code_test_evidence(files, workspace_image)
+        validation = run_code_test_evidence(files, workspace_image, source)
     packet = {
         "task_id": cell.task_id,
         "canonical_task_requirements": prompt_path.read_text(encoding="utf-8"),

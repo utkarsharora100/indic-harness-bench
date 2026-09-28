@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from runner.inference import resolve_university_gpu
+from runner.inference import InferenceTransientError, resolve_university_gpu
 from runner.outcome_judge import (
     OutcomeJudge,
     OutcomeJudgeError,
@@ -34,6 +34,8 @@ from runner.outcome_judge import (
 from runner.proxy import InferenceProxy, ModelProxyError
 from runner.redaction import redact, redact_text
 from runner.sandbox import WorkspaceSandbox
+from runner.study_journal import append_journal, write_heartbeat
+from runner.yaml_config import load_yaml_mapping
 
 OUTCOME_VERSION = "outcome-v7"
 ROUND_ID = "pilot-v14-outcome-v7"
@@ -261,7 +263,8 @@ class OutcomeJudgeRuntime:
             self.root, self.inference_config, verify_tool=False
         )
         manifest_path = self.root / self.inference_config.get(
-            "manifest", "data/phase1/pilot-v14-model-manifest.json"
+            "pinned_model_manifest",
+            self.inference_config.get("manifest", "data/phase1/pilot-v14-model-manifest.json"),
         )
         if not manifest_path.is_file():
             raise OutcomeV2Error("The existing v14 model manifest is missing")
@@ -333,6 +336,39 @@ class OutcomeJudgeRuntime:
             self.proxy.close()
             self.proxy = None
 
+    def wait_for_model_health(self) -> None:
+        if self.proxy is None:
+            raise OutcomeV2Error("Outcome judge runtime is not active")
+        interval = max(30, int(self.inference_config.get("health_check_interval_seconds", 300)))
+        status_path = self.inference_config.get("health_status")
+        journal_path = self.inference_config.get("health_journal")
+        paused = False
+        while True:
+            try:
+                self.proxy.verify_upstream_identity(
+                    int(self.inference_config.get("timeout_seconds", 90))
+                )
+                if paused:
+                    event = {"stage": "judge", "state": "health_restored"}
+                    if status_path:
+                        write_heartbeat(self.root / status_path, **event)
+                    if journal_path:
+                        append_journal(self.root / journal_path, **event)
+                return
+            except InferenceTransientError as exc:
+                paused = True
+                event = {
+                    "stage": "judge",
+                    "state": "paused_for_endpoint",
+                    "error_type": type(exc).__name__,
+                    "next_health_check_seconds": interval,
+                }
+                if status_path:
+                    write_heartbeat(self.root / status_path, **event)
+                if journal_path:
+                    append_journal(self.root / journal_path, **event)
+                time.sleep(interval)
+
     @contextmanager
     def cell_session(self, session_id: str) -> Iterator[dict[str, Any]]:
         if self.proxy is None:
@@ -364,9 +400,7 @@ def init_v2_store(path: Path, manifest: dict[str, Any]) -> sqlite3.Connection:
 def _selection_sources(root: Path, task_root: Path, config: dict[str, Any]) -> dict[str, str]:
     selection_path = root / config["experiment"]["dataset_manifest"]
     try:
-        import yaml
-
-        selection = yaml.safe_load(selection_path.read_text(encoding="utf-8")) or {}
+        selection = load_yaml_mapping(selection_path, label="task selection manifest")
     except (OSError, ValueError) as exc:
         raise OutcomeV2Error("Frozen v14 task-selection manifest cannot be read") from exc
     manifest_tasks = {item["task_id"]: item for item in selection.get("tasks", [])}
@@ -846,14 +880,14 @@ def _adjudicate_passes(
     return "needs_review" if review else "completed", score, ratings, spread, scores
 
 
-def _safe_write_case(files: dict[str, bytes], workspace: Path) -> None:
+def _safe_write_case(files: dict[str, bytes | str], workspace: Path) -> None:
     for relative, content in files.items():
         path = Path(*relative.replace("\\", "/").split("/"))
         if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
             raise OutcomeV2Error("Calibration control contains an unsafe workspace path")
         target = workspace.joinpath(*path.parts)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(content)
+        target.write_bytes(content.encode("utf-8") if isinstance(content, str) else content)
 
 
 def _grade_control_oracle(
@@ -861,10 +895,11 @@ def _grade_control_oracle(
 ) -> dict[str, Any]:
     task_source = task_root / task_id / "source"
     try:
-        import yaml
-
-        task = yaml.safe_load((task_source / "task.yaml").read_text(encoding="utf-8"))
-        oracle_module = task["oracle_module"]
+        task = load_yaml_mapping(task_source / "task.yaml", label=f"task definition {task_id}")
+        # A small number of upstream tasks expose the conventional module
+        # filename without repeating it in task.yaml.  Resolve that contract
+        # explicitly; never substitute a different grader.
+        oracle_module = task.get("oracle_module", "oracle_grade.py")
         timeout = int(task.get("timeout_sec", 600))
     except (OSError, KeyError, TypeError, ValueError) as exc:
         raise OutcomeV2Error(f"Cannot load deterministic calibration oracle for {task_id}") from exc

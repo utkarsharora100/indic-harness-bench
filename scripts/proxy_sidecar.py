@@ -29,6 +29,7 @@ def main() -> None:
         temperature=float(os.environ.get("PHASE1_TEMPERATURE", "0")),
         top_p=float(os.environ.get("PHASE1_TOP_P", "1")),
         max_tokens=int(os.environ.get("PHASE1_MAX_TOKENS", "2048")),
+        max_tool_result_bytes=int(os.environ.get("PHASE1_MAX_TOOL_RESULT_BYTES", "0")),
         bind_host="0.0.0.0",
         listen_port=int(os.environ.get("PHASE1_PORT", "8080")),
         advertised_host="phase1-model-proxy",

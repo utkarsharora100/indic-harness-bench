@@ -28,6 +28,7 @@ class ProxySidecar:
         temperature: float = 0.0,
         top_p: float = 1.0,
         max_tokens: int = 2048,
+        max_tool_result_bytes: int = 0,
     ) -> None:
         self.image = image
         self.internal_network = internal_network
@@ -42,6 +43,7 @@ class ProxySidecar:
         self.temperature = temperature
         self.top_p = top_p
         self.max_tokens = max_tokens
+        self.max_tool_result_bytes = max(0, int(max_tool_result_bytes))
         self.client_key = "phase1-" + secrets.token_urlsafe(18)
         self.container: Any | None = None
         self.client: Any | None = None
@@ -67,6 +69,7 @@ class ProxySidecar:
                 )
             }
         )
+        repository_root = Path(__file__).resolve().parents[1]
         self.container = self.client.containers.run(
             self.image,
             detach=True,
@@ -88,8 +91,19 @@ class ProxySidecar:
                 "PHASE1_TEMPERATURE": str(self.temperature),
                 "PHASE1_TOP_P": str(self.top_p),
                 "PHASE1_MAX_TOKENS": str(self.max_tokens),
+                "PHASE1_MAX_TOOL_RESULT_BYTES": str(self.max_tool_result_bytes),
             },
-            volumes={str(self.host_trace): {"bind": "/trace", "mode": "rw"}},
+            volumes={
+                str(self.host_trace): {"bind": "/trace", "mode": "rw"},
+                str(repository_root / "runner" / "proxy.py"): {
+                    "bind": "/app/runner/proxy.py",
+                    "mode": "ro",
+                },
+                str(repository_root / "scripts" / "proxy_sidecar.py"): {
+                    "bind": "/app/scripts/proxy_sidecar.py",
+                    "mode": "ro",
+                },
+            },
         )
         egress = self.client.networks.get(self.egress_network)
         try:

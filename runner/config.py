@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
+from runner.yaml_config import load_yaml_mapping
 
 
 @dataclass(slots=True)
@@ -18,8 +18,23 @@ class ExperimentConfig:
 
     @classmethod
     def load(cls, path: Path) -> "ExperimentConfig":
-        with path.open("r", encoding="utf-8") as handle:
-            return cls(path.resolve(), yaml.safe_load(handle))
+        resolved = path.resolve()
+        data = load_yaml_mapping(resolved, label="experiment configuration")
+        for section in ("experiment", "generation", "sandbox", "storage"):
+            if not isinstance(data.get(section), dict):
+                raise ValueError(f"Experiment configuration requires a {section} mapping")
+        experiment = data["experiment"]
+        for key in (
+            "id", "dataset_manifest", "prepared_tasks_root", "tasks", "languages",
+            "agents", "models", "repetitions", "seed",
+        ):
+            if key not in experiment:
+                raise ValueError(f"Experiment configuration is missing experiment.{key}")
+        if not isinstance(experiment["tasks"], list) or not experiment["tasks"]:
+            raise ValueError("experiment.tasks must be a non-empty list")
+        if len(experiment["tasks"]) != len(set(experiment["tasks"])):
+            raise ValueError("experiment.tasks must contain unique task IDs")
+        return cls(resolved, data)
 
     @property
     def experiment(self) -> dict[str, Any]:

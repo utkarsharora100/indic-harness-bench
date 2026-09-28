@@ -155,7 +155,10 @@ def test_served_model_bare_integer_scores_are_accepted_and_reasons_are_marked_mi
     criteria = load_rubric(RUBRIC)["tasks"]["016-code-repair-pytest"]["criteria"]
     response = json.dumps({"ratings": {"working_repair": 3, "constraints_and_test_integrity": 4}})
     ratings = validate_judgment(response, criteria, packet)
-    assert ratings["working_repair"]["level"] == 3
+    # A failed independent evaluator suite caps the repair criterion at level 2;
+    # the model's higher proposal remains visible but cannot claim a working fix.
+    assert ratings["working_repair"]["level"] == 2
+    assert ratings["working_repair"]["model_level"] == 3
     assert ratings["working_repair"]["rationale_status"] == "missing"
     assert ratings["progress_note"]["level"] == 0
     assert ratings["progress_note"]["model_level"] is None

@@ -4,8 +4,6 @@ from pathlib import Path
 from typing import Any
 import hashlib
 import json
-import yaml
-
 from runner.config import ExperimentConfig
 from runner.inference import ensure_model_manifest
 from runner.inference import InferenceEndpoint, verify_tool_call
@@ -17,6 +15,7 @@ from benchmark.upstream import cleanup_runtime, prepare_runtime, render_runtime_
 from runner.grader import run_upstream_oracle
 from runner.sandbox import WorkspaceSandbox
 from scripts.prepare_phase1 import tree_sha256
+from runner.yaml_config import load_yaml_mapping
 
 
 class PreflightError(RuntimeError):
@@ -34,7 +33,7 @@ def check_docker_image(config: ExperimentConfig) -> dict[str, Any]:
     try:
         client.ping()
         image = client.images.get(config.sandbox["image"])
-        if config.is_corrected_phase1:
+        if config.is_corrected_phase1 or str(config.experiment.get("version", "")).startswith("openclaw-language-study"):
             expected = str(((_runtime_manifest(config).get("images") or {}).get("benchmark") or {}).get("image_id", ""))
             if not expected or str(image.attrs.get("Id", "")) != expected:
                 raise PreflightError("Benchmark image differs from the frozen runtime manifest")
@@ -378,14 +377,17 @@ print('proxy-ok')
 
 def check_prepared_tasks(config: ExperimentConfig, tasks: list[Any]) -> dict[str, Any]:
     selection_path = config.root / config.experiment.get("dataset_manifest", "benchmark/task_selection.yaml")
-    selection = yaml.safe_load(selection_path.read_text(encoding="utf-8")) or {}
+    selection = load_yaml_mapping(selection_path, label="task selection manifest")
     expected = {str(item["task_id"]): str(item.get("source_sha256", "")) for item in selection.get("tasks", [])}
     if set(expected) != {task.task_id for task in tasks}:
         raise PreflightError("Prepared task set does not match the pinned selection manifest")
     translation_path = config.root / config.experiment.get(
         "translations_manifest", "benchmark/translations/phase1.yaml"
     )
-    translations = (yaml.safe_load(translation_path.read_text(encoding="utf-8")) or {}).get("tasks", {})
+    translations_root = load_yaml_mapping(translation_path, label="translation manifest")
+    translations = translations_root.get("tasks", {})
+    if not isinstance(translations, dict):
+        raise PreflightError("Translation manifest tasks must be a mapping")
     checked = 0
     for task in tasks:
         task_root = config.task_root / task.task_id
@@ -451,6 +453,7 @@ def full_preflight(
         (5, 3, 3, 1): 45,       # corrective pilot
         (24, 3, 3, 1): 216,     # one attempt per main-study condition
         (24, 3, 3, 3): 648,     # originally proposed repeated main study
+        (24, 2, 1, 1): 48,      # OpenClaw English/Hindi language study
     }
     dimensions = (
         matrix["tasks"], matrix["languages"], matrix["agents"], matrix["repetitions"]
@@ -460,7 +463,7 @@ def full_preflight(
         raise PreflightError(f"Unexpected corrective Phase I matrix size: {matrix['cells']}")
     result = {"experiment_id": config.experiment_id, "matrix": matrix}
     selection_path = config.root / config.experiment.get("dataset_manifest", "benchmark/task_selection.yaml")
-    selection_data = yaml.safe_load(selection_path.read_text(encoding="utf-8")) or {}
+    selection_data = load_yaml_mapping(selection_path, label="task selection manifest")
     all_ids = [str(item["task_id"]) for item in selection_data.get("tasks", [])]
     all_prepared = select_tasks(config.task_root, all_ids)
     configured_ids = {task.task_id for task in tasks}
@@ -480,7 +483,7 @@ def full_preflight(
 
 def check_pilot_fixture_parity(config: ExperimentConfig, tasks: list[Any]) -> dict[str, Any]:
     """Recreate post-hook workspaces in all conditions before any cell exists."""
-    if not config.is_corrected_phase1:
+    if not config.is_corrected_phase1 and not str(config.experiment.get("version", "")).startswith("openclaw-language-study"):
         return {"checked": False}
     from runner.runner import workspace_sha256
 

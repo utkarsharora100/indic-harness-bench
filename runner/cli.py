@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import typer
@@ -16,11 +17,13 @@ from analysis.outcome_report_v8 import build_v8_tables
 from analysis.report import build_phase1_report
 from benchmark.loader import discover_tasks, select_tasks
 from runner.config import ExperimentConfig
-from runner.inference import ensure_model_manifest, load_env_file
+from runner.yaml_config import load_yaml_mapping
+from runner.inference import InferenceTransientError, ensure_model_manifest, load_env_file
 from runner.judge import judge_database
 from runner.hybrid_outcome import (
     calibrate_controls as calibrate_hybrid_outcomes,
     judge_database as judge_hybrid_outcomes,
+    validate_artifact_contract,
 )
 from runner.outcome_calibration import build_calibration_cases
 from runner.outcome_calibration_finalize import finalize_calibration_store
@@ -40,6 +43,8 @@ from runner.outcome_v8 import rejudge as rejudge_outcomes_v8
 from runner.preflight import PreflightError, check_pilot_fixture_parity, full_preflight
 from runner.redaction import redact_text
 from runner.runner import ExperimentRunner
+from runner.study_identity import expected_cell_ids
+from runner.study_journal import append_journal, write_heartbeat
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -80,8 +85,7 @@ def _runtime_secret_mapping(runtime: OutcomeJudgeRuntime | None) -> dict | None:
 
 
 def load_yaml(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle) or {}
+    return load_yaml_mapping(path, label="runtime manifest")
 
 
 def load_runtime(config: ExperimentConfig) -> tuple[dict, dict, dict | None]:
@@ -92,9 +96,46 @@ def load_runtime(config: ExperimentConfig) -> tuple[dict, dict, dict | None]:
     for model_name in config.experiment.get("models", []):
         model_config = models.get(model_name, {})
         if model_config.get("provider") == "university_gpu" or model_name == "university_gpu":
-            endpoint, model_manifest = ensure_model_manifest(
-                root, config.inference, verify_tool=True
+            interval = max(
+                30, int(config.inference.get("health_check_interval_seconds", 300))
             )
+            heartbeat_value = config.inference.get("health_status") or config.storage.get("heartbeat")
+            journal_value = config.inference.get("health_journal") or config.storage.get("journal")
+            heartbeat_path = root / heartbeat_value if isinstance(heartbeat_value, str) else None
+            journal_path = root / journal_value if isinstance(journal_value, str) else None
+            while True:
+                try:
+                    endpoint, model_manifest = ensure_model_manifest(
+                        root, config.inference, verify_tool=True
+                    )
+                    break
+                except InferenceTransientError as exc:
+                    event = {
+                        "experiment_id": config.experiment_id,
+                        "state": "paused_for_endpoint",
+                        "stage": "runtime_model_preflight",
+                        "error_type": type(exc).__name__,
+                        "next_health_check_seconds": interval,
+                    }
+                    if heartbeat_path is not None:
+                        write_heartbeat(heartbeat_path, **event)
+                    if journal_path is not None:
+                        append_journal(journal_path, **event)
+                    time.sleep(interval)
+                    if journal_path is not None:
+                        append_journal(
+                            journal_path,
+                            experiment_id=config.experiment_id,
+                            state="runtime_preflight_resumed",
+                        )
+            pinned_path = config.inference.get("pinned_model_manifest")
+            if pinned_path:
+                pinned = load_yaml_mapping(root / pinned_path, label="pinned model manifest") if str(pinned_path).endswith((".yaml", ".yml")) else json.loads((root / pinned_path).read_text(encoding="utf-8"))
+                if (
+                    pinned.get("resolved_model") != endpoint.resolved_model
+                    or sorted(pinned.get("served_models", [])) != sorted(endpoint.served_models)
+                ):
+                    raise ValueError("University endpoint model identity differs from the frozen v14 pin")
             models[model_name] = endpoint.model_config()
     return agents, models, model_manifest
 
@@ -107,6 +148,32 @@ def list_tasks(tasks_dir: Path = typer.Option(Path("benchmark/tasks"), exists=Tr
     console.print(table)
 
 
+@app.command("openclaw-language-study")
+def openclaw_language_study(
+    config: Path = typer.Option(Path("configs/phase1.openclaw-language.yaml"), exists=True),
+    gate_only: bool = typer.Option(False, "--gate-only", help="Run preflight and judge controls without starting agent cells."),
+) -> None:
+    """Run or resume the English/Hindi OpenClaw study and automatic judging."""
+    from runner.openclaw_language_study import run_openclaw_language_study
+
+    try:
+        result = run_openclaw_language_study(config, gate_only=gate_only)
+    except Exception as exc:
+        console.print(f"OpenClaw language study stopped: {type(exc).__name__}; see the private local failure journal.")
+        raise typer.Exit(code=2) from None
+    console.print(result)
+
+
+@app.command("openclaw-language-status")
+def openclaw_language_status(
+    config: Path = typer.Option(Path("configs/phase1.openclaw-language.yaml"), exists=True),
+) -> None:
+    """Read local OpenClaw study progress without making inference calls."""
+    from runner.openclaw_language_study import status_openclaw_study
+
+    console.print(status_openclaw_study(config))
+
+
 @app.command("preflight-study")
 def preflight_study(
     config: Path = typer.Option(Path("configs/phase1.corrected.main24-v1.yaml"), exists=True),
@@ -116,6 +183,11 @@ def preflight_study(
     try:
         agents, models, _ = load_runtime(experiment)
         tasks = select_tasks(experiment.task_root, experiment.configured_task_ids)
+        validate_artifact_contract(
+            experiment.task_root,
+            experiment.root / experiment.experiment["artifact_contract"],
+            experiment.configured_task_ids,
+        )
         result = full_preflight(experiment, tasks, agents, models)
     except PreflightError as exc:
         console.print(f"Study preflight failed: {exc}")
@@ -156,6 +228,12 @@ def run(
     task_ids = experiment_config.configured_task_ids
     task_defs = select_tasks(experiment_config.task_root, task_ids)
     try:
+        if experiment_config.experiment.get("artifact_contract"):
+            validate_artifact_contract(
+                experiment_config.task_root,
+                experiment_config.root / experiment_config.experiment["artifact_contract"],
+                task_ids,
+            )
         gate = full_preflight(experiment_config, task_defs, agents, models)
     except PreflightError as exc:
         console.print(f"Preflight failed: {exc}")
@@ -188,9 +266,11 @@ def run(
 
 @app.command("judge-main24-outcomes")
 def judge_main24_outcomes(
-    config: Path = typer.Option(Path("configs/phase1.corrected.main24-v1.yaml"), exists=True),
-    database: Path = typer.Option(Path("data/phase1/corrected/main24-v1/runs.sqlite"), exists=True),
-    output: Path = typer.Option(Path("data/phase1/corrected/main24-v1/outcomes-v4.sqlite")),
+    config: Path = typer.Option(Path("configs/phase1.corrected.main24-llm-v5.yaml"), exists=True),
+    database: Path = typer.Option(Path("data/phase1/corrected/main24-llm-v5/runs.sqlite"), exists=True),
+    output: Path | None = typer.Option(None),
+    rubric: Path | None = typer.Option(None),
+    calibration: Path | None = typer.Option(None),
     expected_cells: int = typer.Option(216, min=1),
     experiment_id: str | None = typer.Option(None, "--experiment-id"),
 ) -> None:
@@ -202,11 +282,21 @@ def judge_main24_outcomes(
         with runtime:
             result = judge_hybrid_outcomes(
                 database=experiment.root / database,
-                output=experiment.root / output,
+                output=experiment.root / (output or experiment.inference["outcome_store"]),
                 experiment_id=experiment_id or experiment.experiment_id,
                 task_root=experiment.task_root,
                 workspace_image=str(experiment.sandbox["image"]),
                 runtime=runtime,
+                rubric_path=experiment.root / (
+                    rubric or experiment.inference["outcome_rubric"]
+                ),
+                artifact_contract_path=experiment.root / experiment.experiment["artifact_contract"],
+                calibration_report_path=experiment.root / (
+                    calibration or experiment.inference["outcome_calibration_report"]
+                ),
+                expected_cell_ids=(
+                    expected_cell_ids(experiment) if expected_cells != 44 else None
+                ),
                 expected_cells=expected_cells,
                 seed=int(experiment.experiment.get("seed", 1701)),
             )
@@ -227,8 +317,8 @@ def judge_main24_outcomes(
 
 @app.command("calibrate-main24-outcomes")
 def calibrate_main24_outcomes(
-    config: Path = typer.Option(Path("configs/phase1.corrected.main24-v1.yaml"), exists=True),
-    output: Path = typer.Option(Path("data/phase1/corrected/main24-v1/calibration-v4.sqlite")),
+    config: Path = typer.Option(Path("configs/phase1.corrected.main24-llm-v5.yaml"), exists=True),
+    output: Path | None = typer.Option(None),
 ) -> None:
     """Run the frozen reference-guided outcome controls and save their status."""
     runtime = None
@@ -240,7 +330,13 @@ def calibrate_main24_outcomes(
                 task_root=experiment.task_root,
                 workspace_image=str(experiment.sandbox["image"]),
                 runtime=runtime,
-                output=experiment.root / output,
+                output=experiment.root
+                / (output or experiment.inference["outcome_calibration_store"]),
+                rubric_path=experiment.root / experiment.inference["outcome_rubric"],
+                artifact_contract_path=experiment.root
+                / experiment.experiment["artifact_contract"],
+                calibration_report_path=experiment.root
+                / experiment.inference["outcome_calibration_report"],
                 seed=int(experiment.experiment.get("seed", 1701)),
             )
         console.print(
@@ -330,6 +426,7 @@ def judge(
             outcome_database=(experiment_config.root / outcome_database)
             if outcome_database
             else None,
+            health_check=runner._wait_for_pinned_model,
         )
     finally:
         runner.close()

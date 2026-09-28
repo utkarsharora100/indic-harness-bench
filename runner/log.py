@@ -106,6 +106,14 @@ CREATE TABLE IF NOT EXISTS process_grade (
     combined_score REAL,
     details TEXT
 );
+CREATE TABLE IF NOT EXISTS process_judge_event (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    attempt_no INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS failure (
     run_id TEXT NOT NULL,
     failure_category TEXT NOT NULL,
