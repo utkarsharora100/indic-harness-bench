@@ -4,12 +4,14 @@ import hashlib
 import json
 import random
 import tarfile
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from time import monotonic, sleep
 from types import SimpleNamespace
 from typing import Any
+from urllib.parse import urlsplit
 
 from agents.base import AgentRequest, AgentResponse
 from agents.factory import build_agent
@@ -29,7 +31,6 @@ from runner.proxy_sidecar import ProxySidecar
 from runner.redaction import redact
 from runner.sandbox import SandboxInfrastructureError, WorkspaceSandbox
 from runner.study_journal import append_journal, write_heartbeat
-
 
 SYSTEM_PROMPT = (
     "You are operating in a controlled benchmark workspace. "
@@ -95,6 +96,76 @@ def stable_cell_id(
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
 
+def _dataset_revision(config: ExperimentConfig) -> str:
+    manifest_path = config.root / config.experiment.get(
+        "dataset_manifest", "benchmark/task_selection.yaml"
+    )
+    try:
+        from runner.yaml_config import load_yaml_mapping
+
+        data = load_yaml_mapping(manifest_path, label="task selection manifest")
+        return str(data.get("source", {}).get("revision", "unknown"))
+    except (OSError, ValueError):
+        return "unknown"
+
+
+def plan_experiment_cells(
+    config: ExperimentConfig,
+    agents: dict,
+    models: dict,
+    tasks: list[TaskDefinition],
+) -> list[Cell]:
+    """Build the frozen matrix without starting proxies or opening run storage."""
+    experiment = config.experiment
+    configured_ids = experiment.get("tasks")
+    actual_ids = [task.task_id for task in tasks]
+    if configured_ids is not None and actual_ids != list(configured_ids):
+        raise ValueError(
+            "Runner task list must match experiment.tasks exactly; "
+            f"configured={list(configured_ids)!r}, actual={actual_ids!r}"
+        )
+    languages = list(experiment.get("languages", []))
+    agent_names = list(experiment.get("agents", []))
+    model_names = list(experiment.get("models", []))
+    if not languages or not agent_names or not model_names:
+        raise ValueError("Experiment matrix dimensions must be non-empty")
+    if len(set(languages)) != len(languages):
+        raise ValueError("Experiment languages must not contain duplicates")
+    for language in languages:
+        if language not in {"english", "hindi", "hinglish"}:
+            raise ValueError(f"Unsupported language: {language}")
+    for agent in agent_names:
+        if agent not in agents:
+            raise ValueError(f"Configured agent is missing: {agent}")
+    for model in model_names:
+        if model not in models:
+            raise ValueError(f"Configured model is missing: {model}")
+
+    revision = _dataset_revision(config)
+    base_seed = int(experiment.get("seed", 0))
+    cells: list[Cell] = []
+    for task in tasks:
+        for language in languages:
+            for agent in agent_names:
+                for model in model_names:
+                    for repetition in range(int(experiment["repetitions"])):
+                        model_id = str(models[model].get("model", model))
+                        cell_id = stable_cell_id(
+                            config.experiment_id,
+                            revision,
+                            task.task_id,
+                            language,
+                            agent,
+                            model_id,
+                            repetition,
+                        )
+                        cells.append(Cell(
+                            task, language, agent, model, repetition,
+                            base_seed + repetition, cell_id,
+                        ))
+    return cells
+
+
 def is_transient_endpoint_error(exc: Exception) -> bool:
     if isinstance(exc, InferenceTransientError):
         return True
@@ -114,14 +185,21 @@ def is_transient_endpoint_error(exc: Exception) -> bool:
 class ExperimentRunner:
     def __init__(self, config: ExperimentConfig, agents: dict, models: dict) -> None:
         self.config = config
-        self.agents = agents
-        self.models = models
+        self.agents = deepcopy(agents)
+        self.models = deepcopy(models)
+        self.model_identities = {
+            name: str(model.get("model", name)) for name, model in self.models.items()
+        }
         self.proxies: dict[str, InferenceProxy] = {}
         proxy_config = config.inference.get("proxy") or {}
         if proxy_config.get("enabled"):
             for model_name, model_config in list(self.models.items()):
                 if model_config.get("provider") != "university_gpu":
                     continue
+                if model_config.get("proxy"):
+                    raise ValueError(
+                        f"Model {model_name} already contains proxy settings; refusing a proxy chain"
+                    )
                 if not model_config.get("base_url") or not model_config.get("api_key"):
                     raise ValueError(f"Model {model_name} cannot use the proxy without private endpoint settings")
                 proxy = InferenceProxy(
@@ -154,53 +232,11 @@ class ExperimentRunner:
             proxy.close()
 
     def plan_cells(self, tasks: list[TaskDefinition]) -> list[Cell]:
-        experiment = self.config.experiment
-        configured_ids = experiment.get("tasks")
-        actual_ids = [task.task_id for task in tasks]
-        if configured_ids is not None and actual_ids != list(configured_ids):
-            raise ValueError(
-                "Runner task list must match experiment.tasks exactly; "
-                f"configured={list(configured_ids)!r}, actual={actual_ids!r}"
-            )
-        languages = list(experiment.get("languages", []))
-        agents = list(experiment.get("agents", []))
-        models = list(experiment.get("models", []))
-        if not languages or not agents or not models:
-            raise ValueError("Experiment matrix dimensions must be non-empty")
-        if len(set(languages)) != len(languages):
-            raise ValueError("Experiment languages must not contain duplicates")
-        for language in languages:
-            if language not in {"english", "hindi", "hinglish"}:
-                raise ValueError(f"Unsupported language: {language}")
-        for agent in agents:
-            if agent not in self.agents:
-                raise ValueError(f"Configured agent is missing: {agent}")
-        for model in models:
-            if model not in self.models:
-                raise ValueError(f"Configured model is missing: {model}")
-        revision = self._dataset_revision()
-        base_seed = int(experiment.get("seed", 0))
-        cells: list[Cell] = []
-        for task in tasks:
-            for language in languages:
-                for agent in agents:
-                    for model in models:
-                        for repetition in range(int(experiment["repetitions"])):
-                            model_id = str(self.models[model].get("model", model))
-                            seed = base_seed + repetition
-                            cell_id = stable_cell_id(
-                                self.config.experiment_id,
-                                revision,
-                                task.task_id,
-                                language,
-                                agent,
-                                model_id,
-                                repetition,
-                            )
-                            cells.append(
-                                Cell(task, language, agent, model, repetition, seed, cell_id)
-                            )
-        return cells
+        stable_models = {
+            name: {**settings, "model": self.model_identities[name]}
+            for name, settings in self.models.items()
+        }
+        return plan_experiment_cells(self.config, self.agents, stable_models, tasks)
 
     def validate_matrix(self, tasks: list[TaskDefinition]) -> dict[str, int]:
         cells = self.plan_cells(tasks)
@@ -334,16 +370,35 @@ class ExperimentRunner:
         for proxy in self.proxies.values():
             while True:
                 try:
+                    if (
+                        proxy.server is None
+                        or proxy.thread is None
+                        or not proxy.thread.is_alive()
+                    ):
+                        raise RuntimeError("Local inference proxy is not running")
                     proxy.verify_upstream_identity(
                         int(self.config.inference.get("timeout_seconds", 90))
                     )
                     break
                 except InferenceTransientError as exc:
+                    failure_kind = getattr(exc, "failure_kind", "upstream_unavailable")
+                    upstream_host = (urlsplit(proxy.upstream_base_url).hostname or "").lower()
+                    if failure_kind == "connection_refused" and upstream_host in {
+                        "localhost", "127.0.0.1", "::1", "host.docker.internal"
+                    }:
+                        failure_kind = "stale_local_proxy_target"
                     event = {
                         "experiment_id": self.config.experiment_id,
                         "state": "paused_for_endpoint",
                         "cell_id": cell_id,
                         "error_type": type(exc).__name__,
+                        "failure_kind": failure_kind,
+                        "status_code": getattr(exc, "status_code", None),
+                        "upstream_route": (
+                            "local_proxy" if upstream_host in {
+                                "localhost", "127.0.0.1", "::1", "host.docker.internal"
+                            } else "configured_university_endpoint"
+                        ),
                         "next_health_check_seconds": interval,
                     }
                     if heartbeat_path is not None:
@@ -356,6 +411,30 @@ class ExperimentRunner:
                         state="health_check_resumed",
                         cell_id=cell_id,
                     )
+                except Exception as exc:
+                    status_code = getattr(exc, "status_code", None)
+                    failure_kind = getattr(exc, "failure_kind", None)
+                    if not failure_kind and status_code in {400, 401, 403, 404, 422}:
+                        failure_kind = "model_or_policy_rejection"
+                    if not failure_kind:
+                        failure_kind = (
+                            "local_proxy_stopped"
+                            if isinstance(exc, RuntimeError)
+                            and str(exc) == "Local inference proxy is not running"
+                            else "pinned_model_or_configuration_error"
+                        )
+                    event = {
+                        "experiment_id": self.config.experiment_id,
+                        "state": "blocked_model_check",
+                        "cell_id": cell_id,
+                        "error_type": type(exc).__name__,
+                        "failure_kind": failure_kind,
+                        "status_code": status_code,
+                    }
+                    if heartbeat_path is not None:
+                        write_heartbeat(heartbeat_path, **event)
+                    append_journal(journal_path, **event)
+                    raise
 
     @staticmethod
     def _execution_order(cells: list[Cell], seed: int) -> list[Cell]:
@@ -640,9 +719,13 @@ class ExperimentRunner:
                     image=str(proxy_config.get("image", "indic-harness-proxy:phase1-pinned")),
                     internal_network=str(self.agents[cell.agent].get("network", "phase1-agent-net")),
                     egress_network=str(proxy_config.get("egress_network", "bridge")),
-                    upstream_base_url=host_proxy.upstream_base_url,
-                    upstream_key=host_proxy.upstream_key,
-                    resolved_model=host_proxy.resolved_model,
+                    # Docker Desktop containers on campus Wi-Fi cannot route
+                    # reliably to the university's private LAN address. The
+                    # host proxy is already the credentialed egress boundary;
+                    # the sidecar reaches it over Docker Desktop's host gateway.
+                    upstream_base_url=host_proxy.container_base_url,
+                    upstream_key=host_proxy.client_key,
+                    resolved_model=host_proxy.public_model,
                     public_model=host_proxy.public_model,
                     trace_root=self.config.root / self.config.storage["traces_dir"] / "sidecars",
                     cell_id=cell.cell_id,
@@ -691,7 +774,10 @@ class ExperimentRunner:
                 metadata={"cell_id": cell.cell_id, "attempt_id": attempt_id, "session_id": attempt_id},
             )
             agent_started = monotonic()
-            proxy = self.proxies.get(cell.model) if cell.agent == "react" else None
+            # Keep one host-proxy cell session for both ReAct and native
+            # harnesses. Native traffic arrives through the sidecar, which
+            # forwards only to this authenticated host proxy.
+            proxy = self.proxies.get(cell.model)
             sidecar_snapshot: dict[str, Any] | None = None
             if proxy is not None:
                 proxy.begin_cell(cell.cell_id)
@@ -858,8 +944,8 @@ class ExperimentRunner:
                         trace_event = self._event(
                             cell.cell_id,
                             0,
-                            proxy_event["event_type"],
-                            observable,
+                            f"host_relay_{proxy_event['event_type']}",
+                            {"source": "host_relay", **observable},
                         )
                         trace_event["timestamp"] = proxy_event.get(
                             "timestamp", trace_event["timestamp"]
@@ -869,7 +955,7 @@ class ExperimentRunner:
                             run_id=cell.cell_id,
                             attempt_id=attempt_id,
                             step=0,
-                            event_type=proxy_event["event_type"],
+                            event_type=trace_event["event_type"],
                             timestamp=trace_event["timestamp"],
                             result=observable,
                         )
@@ -879,8 +965,8 @@ class ExperimentRunner:
                         trace_event = self._event(
                             cell.cell_id,
                             0,
-                            sidecar_event.get("event_type", "proxy_event"),
-                            observable,
+                            f"agent_sidecar_{sidecar_event.get('event_type', 'proxy_event')}",
+                            {"source": "agent_sidecar", **observable},
                         )
                         trace_event["timestamp"] = sidecar_event.get(
                             "timestamp", trace_event["timestamp"]
@@ -905,16 +991,7 @@ class ExperimentRunner:
                     )
 
     def _dataset_revision(self) -> str:
-        manifest_path = self.config.root / self.config.experiment.get(
-            "dataset_manifest", "benchmark/task_selection.yaml"
-        )
-        try:
-            from runner.yaml_config import load_yaml_mapping
-
-            data = load_yaml_mapping(manifest_path, label="task selection manifest")
-            return str(data.get("source", {}).get("revision", "unknown"))
-        except (OSError, ValueError):
-            return "unknown"
+        return _dataset_revision(self.config)
 
     def _experiment_manifest(self) -> dict[str, Any]:
         path = self.config.root / self.config.experiment.get(

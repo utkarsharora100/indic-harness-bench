@@ -115,6 +115,8 @@ def load_runtime(config: ExperimentConfig) -> tuple[dict, dict, dict | None]:
                         "state": "paused_for_endpoint",
                         "stage": "runtime_model_preflight",
                         "error_type": type(exc).__name__,
+                        "failure_kind": getattr(exc, "failure_kind", "upstream_unavailable"),
+                        "status_code": getattr(exc, "status_code", None),
                         "next_health_check_seconds": interval,
                     }
                     if heartbeat_path is not None:

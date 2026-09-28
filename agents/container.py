@@ -12,6 +12,21 @@ from agents.base import AgentAdapter, AgentRequest, AgentResponse
 from agents.external import _parse_openclaw_json
 
 
+def _write_openclaw_retry_settings(state_dir: Path) -> Path:
+    """Disable OpenClaw provider/recovery retries for one-attempt studies."""
+    # OpenClaw v2026.9.5 resolves the default agent directory under
+    # $OPENCLAW_STATE_DIR/agents/main/agent and loads its settings.json there.
+    path = state_dir / "agents" / "main" / "agent" / "settings.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {"retry": {"enabled": False, "maxRetries": 0, "provider": {"maxRetries": 0}}}
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 @dataclass(slots=True)
 class ContainerHarnessConfig:
     image: str
@@ -83,6 +98,7 @@ class ContainerHarnessAdapter:
                     encoding="utf-8",
                 )
             elif self.name == "openclaw":
+                _write_openclaw_retry_settings(state_dir)
                 config_path.write_text(
                     json.dumps(
                         {

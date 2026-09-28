@@ -77,6 +77,11 @@ class ProxySidecar:
             networking_config=networking_config,
             network_disabled=False,
             hostname="phase1-model-proxy",
+            # Docker Desktop does not always inject this name into a custom
+            # internal network. The sidecar is also attached to its egress
+            # bridge, so host-gateway routes its upstream through the laptop
+            # proxy without giving the agent a host route.
+            extra_hosts={"host.docker.internal": "host-gateway"},
             # Runs are sequential, so a stable DNS name gives the native
             # harnesses a deterministic endpoint on the internal network.
             name="phase1-model-proxy",

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from agents.container import _write_openclaw_retry_settings
 from analysis.corrected import trace_links, task_balanced_lift
 from benchmark.canonical import blob_tree_sha256, materialize_blobs, task_blobs
 from runner.config import ExperimentConfig
@@ -15,6 +16,15 @@ from runner.runner import ExperimentRunner, _first_proxy_prompt_tokens
 from runner.log import RunStore
 from scripts.calibrate_pilot_budget import PROBES
 from scripts.prepare_phase1 import tree_sha256
+
+
+def test_openclaw_runtime_disables_provider_retries(tmp_path: Path) -> None:
+    settings_path = _write_openclaw_retry_settings(tmp_path)
+    assert settings_path == tmp_path / "agents" / "main" / "agent" / "settings.json"
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert settings["retry"]["enabled"] is False
+    assert settings["retry"]["maxRetries"] == 0
+    assert settings["retry"]["provider"]["maxRetries"] == 0
 
 
 def _git(repository: Path, *args: str) -> None:

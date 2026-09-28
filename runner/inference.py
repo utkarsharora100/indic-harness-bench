@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import errno
 import json
+import socket
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -12,9 +14,38 @@ from typing import Any
 class InferenceConfigurationError(RuntimeError):
     """The configured inference service cannot be used for this experiment."""
 
+    def __init__(
+        self, message: str, *, failure_kind: str | None = None, status_code: int | None = None
+    ) -> None:
+        super().__init__(message)
+        self.failure_kind = failure_kind
+        self.status_code = status_code
+
 
 class InferenceTransientError(RuntimeError):
     """A request failed in a way that is safe to retry."""
+
+    def __init__(
+        self, message: str, *, failure_kind: str = "upstream_unavailable",
+        status_code: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.failure_kind = failure_kind
+        self.status_code = status_code
+
+
+def _transport_failure_kind(exc: BaseException) -> str:
+    reason = getattr(exc, "reason", exc)
+    if isinstance(reason, (TimeoutError, socket.timeout)):
+        return "timeout"
+    if isinstance(reason, socket.gaierror):
+        return "dns_resolution_failed"
+    if isinstance(reason, OSError):
+        if reason.errno in {errno.ECONNREFUSED, 10061}:
+            return "connection_refused"
+        if reason.errno in {errno.ENETUNREACH, errno.EHOSTUNREACH, 10051, 10065}:
+            return "network_unreachable"
+    return "transport_unavailable"
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,16 +106,37 @@ def _json_request(
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             raw = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")[-2000:]
+        exc.read(4096)
+        if exc.code == 429:
+            kind = "rate_limited"
+        elif exc.code == 408:
+            kind = "timeout"
+        elif exc.code == 425:
+            kind = "upstream_not_ready"
+        elif exc.code >= 500:
+            kind = "upstream_server_error"
+        else:
+            kind = "model_or_policy_rejection"
         if exc.code in {408, 425, 429} or exc.code >= 500:
-            raise InferenceTransientError(f"HTTP {exc.code}: {detail}") from exc
-        raise InferenceConfigurationError(f"HTTP {exc.code}: {detail}") from exc
+            raise InferenceTransientError(
+                f"Inference endpoint returned HTTP {exc.code}",
+                failure_kind=kind,
+                status_code=exc.code,
+            ) from exc
+        raise InferenceConfigurationError(
+            f"Inference endpoint returned HTTP {exc.code}",
+            failure_kind=kind,
+            status_code=exc.code,
+        ) from exc
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise InferenceTransientError(str(exc)) from exc
+        raise InferenceTransientError(
+            "Inference endpoint transport failure",
+            failure_kind=_transport_failure_kind(exc),
+        ) from exc
     try:
         result = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise InferenceConfigurationError(f"Inference endpoint returned invalid JSON: {raw[:500]!r}") from exc
+        raise InferenceConfigurationError("Inference endpoint returned invalid JSON") from exc
     if not isinstance(result, dict):
         raise InferenceConfigurationError("Inference endpoint returned a non-object JSON value")
     return result

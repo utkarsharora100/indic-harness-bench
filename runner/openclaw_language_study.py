@@ -1144,26 +1144,59 @@ def _safe_filename(value: str) -> str:
 def _configured_secrets(config: ExperimentConfig) -> tuple[str, ...]:
     from runner.inference import load_env_file
 
+    values: set[str] = set()
     env_path = config.root / str(config.inference.get("env_file", ""))
-    if not env_path.is_file():
-        return ()
-    try:
-        values = load_env_file(env_path)
-    except Exception:
-        return ()
-    return tuple(value for value in values.values() if value)
+    if env_path.is_file():
+        try:
+            values.update(value for value in load_env_file(env_path).values() if value)
+        except Exception:
+            pass
+    # Resolved IDs may contain private server paths and are not necessarily
+    # present in the local env file. Treat every recorded model identity as a
+    # redaction value when saving launch diagnostics.
+    for setting in ("manifest", "pinned_model_manifest"):
+        relative = config.inference.get(setting)
+        if not isinstance(relative, str):
+            continue
+        path = config.root / relative
+        try:
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for key in ("requested_model", "resolved_model"):
+            value = manifest.get(key)
+            if isinstance(value, str) and value:
+                values.add(value)
+        served = manifest.get("served_models")
+        if isinstance(served, list):
+            values.update(value for value in served if isinstance(value, str) and value)
+    return tuple(sorted(values, key=len, reverse=True))
 
 
 def _record_preflight_failure(config: ExperimentConfig, exc: Exception) -> None:
     secrets = _configured_secrets(config)
     safe_error = redact_text(f"{type(exc).__name__}: {exc}", secrets)
+    cause: BaseException | None = exc
+    failure_kind = None
+    status_code = None
+    for _ in range(8):
+        if cause is None:
+            break
+        failure_kind = failure_kind or getattr(cause, "failure_kind", None)
+        status_code = status_code or getattr(cause, "status_code", None)
+        cause = cause.__cause__ or cause.__context__
     output_root = config.root / config.storage["experiment_dir"]
     output_root.mkdir(parents=True, exist_ok=True)
     _save_json(output_root / "preflight-failure.json", {
         "study": "OpenClaw Language Study", "error": safe_error, "time": _now(),
+        "failure_kind": failure_kind, "status_code": status_code,
     })
     try:
-        append_journal(config.root / config.storage["journal"], state="blocked_preflight", error=safe_error)
+        append_journal(
+            config.root / config.storage["journal"],
+            state="blocked_preflight", error=safe_error,
+            failure_kind=failure_kind, status_code=status_code,
+        )
     except Exception:
         # Preserve the original gate failure even if the secondary journal is unavailable.
         pass
@@ -1862,10 +1895,10 @@ def _run_openclaw_language_study_locked(
     config_path: Path, *, gate_only: bool = False, phase: str = "executions"
 ) -> dict[str, Any]:
     """Run one resumable phase under the caller's study lock."""
+    from benchmark.loader import select_tasks
     from runner.cli import load_runtime
     from runner.preflight import PreflightError, full_preflight
     from runner.runner import ExperimentRunner
-    from benchmark.loader import select_tasks
 
     config = ExperimentConfig.load(config_path)
     output_root = config.root / config.storage["experiment_dir"]
@@ -1910,12 +1943,10 @@ def _run_openclaw_language_study_locked(
             }
             store = StudyStore(config.root / config.inference["study_store"], store_identity)
             try:
-                runner_probe = ExperimentRunner(config, agents, models)
-                try:
-                    cells = runner_probe.plan_cells(tasks)
-                    blocks = balanced_task_blocks(cells, int(config.experiment["seed"]))
-                finally:
-                    runner_probe.close()
+                from runner.runner import plan_experiment_cells
+
+                cells = plan_experiment_cells(config, agents, models, tasks)
+                blocks = balanced_task_blocks(cells, int(config.experiment["seed"]))
                 store.register_cells(blocks)
                 store.set_meta("matrix_cell_ids", [cell.cell_id for block in blocks for cell in block])
                 store.set_meta("execution_order", [[cell.cell_id for cell in block] for block in blocks])

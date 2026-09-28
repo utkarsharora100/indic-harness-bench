@@ -230,16 +230,31 @@ def check_proxy_sidecar(config: ExperimentConfig, agents: dict[str, Any]) -> dic
     internal_network = str(native[0].get("network", ""))
     trace_root = config.root / config.storage.get("traces_dir", "data/phase1/traces") / "preflight-sidecar"
     sidecar: ProxySidecar | None = None
+    host_proxy: InferenceProxy | None = None
     client = docker.from_env()
     probe = None
     try:
+        # The laptop can reach the university LAN endpoint; Docker Desktop
+        # bridge containers on campus Wi-Fi sometimes cannot. Relay the
+        # sidecar through the same credentialed host proxy used for ReAct.
+        host_proxy = InferenceProxy(
+            endpoint.base_url,
+            endpoint.api_key,
+            endpoint.resolved_model,
+            public_model=public_model,
+            max_calls_per_cell=int(proxy_config.get("max_calls_per_cell", 40)),
+            temperature=float(config.generation.get("temperature", 0.0)),
+            top_p=float(config.generation.get("top_p", 1.0)),
+            max_tokens=int(config.generation.get("max_tokens", 2048)),
+        ).start()
+        host_proxy.begin_cell("preflight-proxy")
         sidecar = ProxySidecar(
             image=str(proxy_config.get("image")),
             internal_network=internal_network,
             egress_network=str(proxy_config.get("egress_network", "bridge")),
-            upstream_base_url=endpoint.base_url,
-            upstream_key=endpoint.api_key,
-            resolved_model=endpoint.resolved_model,
+            upstream_base_url=host_proxy.container_base_url,
+            upstream_key=host_proxy.client_key,
+            resolved_model=public_model,
             public_model=public_model,
             trace_root=trace_root,
             cell_id="preflight-proxy",
@@ -360,6 +375,8 @@ print('proxy-ok')
             raise PreflightError("The internal model proxy did not capture streamed token usage")
         if endpoint.resolved_model in json.dumps(snapshot, ensure_ascii=False):
             raise PreflightError("The private served model identifier appeared in sidecar trace data")
+        if host_proxy._cell_calls != 2:
+            raise PreflightError("The host proxy did not receive both sidecar preflight calls")
         return {"enabled": True, "tool_call_verified": True, "stream_usage_verified": True,
                 "calls": 2, "usage_present": True}
     except (docker.errors.DockerException, OSError, TimeoutError) as exc:
@@ -372,6 +389,10 @@ print('proxy-ok')
                 pass
         if sidecar is not None:
             sidecar.close()
+        if host_proxy is not None:
+            if host_proxy.active_cell_id is not None:
+                host_proxy.end_cell()
+            host_proxy.close()
         client.close()
 
 
