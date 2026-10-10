@@ -22,12 +22,12 @@ jobs:
         run: python tools/build_llm_source.py
       - name: Commit the generated corpus
         run: |
-          if git diff --quiet -- LLM_SOURCE.md; then
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f LLM_SOURCE.md
+          if git diff --cached --quiet -- LLM_SOURCE.md; then
             echo "LLM_SOURCE.md is already up to date."
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add LLM_SOURCE.md
           git commit -m "Generate complete LLM-friendly source corpus"
           git push origin HEAD:llm-export-prishiv-dev-20261010
